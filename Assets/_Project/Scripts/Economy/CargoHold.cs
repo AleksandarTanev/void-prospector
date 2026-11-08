@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using R3;
 using VoidProspector.Core;
 using VoidProspector.Data;
 using VoidProspector.Mining;
@@ -9,30 +10,29 @@ namespace VoidProspector.Economy
     /// <summary>Chunks collected but not yet sold. Limited by capacity.</summary>
     public sealed class CargoHold
     {
-        public event Action Changed;
-
         readonly Dictionary<(MineralDefinition mineral, int grade), int> _counts = new Dictionary<(MineralDefinition, int), int>();
-        int _capacity;
+        readonly ReactiveProperty<int> _capacity;
+        readonly ReactiveProperty<int> _count = new ReactiveProperty<int>(0);
+        readonly ReactiveProperty<GameNumber> _value = new ReactiveProperty<GameNumber>(GameNumber.Zero);
 
-        public CargoHold(int capacity) => _capacity = Math.Max(0, capacity);
+        public CargoHold(int capacity) => _capacity = new ReactiveProperty<int>(Math.Max(0, capacity));
 
         public int Capacity
         {
-            get => _capacity;
-            set
-            {
-                value = Math.Max(0, value);
-                if (value == _capacity) return;
-                _capacity = value;
-                Changed?.Invoke();
-            }
+            get => _capacity.Value;
+            set => _capacity.Value = Math.Max(0, value);
         }
 
-        public int Count { get; private set; }
-        public GameNumber Value { get; private set; }
-        public bool IsFull => Count >= _capacity;
+        public int Count => _count.Value;
+        public GameNumber Value => _value.Value;
+        public bool IsFull => Count >= Capacity;
         public bool IsEmpty => Count == 0;
-        public float Fill => _capacity > 0 ? Math.Min(1f, (float)Count / _capacity) : 1f;
+        public float Fill => Capacity > 0 ? Math.Min(1f, (float)Count / Capacity) : 1f;
+
+        // UI bindings: each emits the current value on subscribe, then every change.
+        public ReadOnlyReactiveProperty<int> CapacityRx => _capacity;
+        public ReadOnlyReactiveProperty<int> CountRx => _count;
+        public ReadOnlyReactiveProperty<GameNumber> ValueRx => _value;
 
         public int CountOf(MineralDefinition mineral, int grade) =>
             _counts.TryGetValue((mineral, grade), out int n) ? n : 0;
@@ -51,9 +51,9 @@ namespace VoidProspector.Economy
             if (IsFull) return false;
             var key = (chunk.mineral, chunk.grade);
             _counts[key] = CountOf(chunk.mineral, chunk.grade) + 1;
-            Count++;
-            Value += chunk.value;
-            Changed?.Invoke();
+            // Value first, so a subscriber to Count already sees the new value.
+            _value.Value = Value + chunk.value;
+            _count.Value = Count + 1;
             return true;
         }
 
@@ -63,9 +63,8 @@ namespace VoidProspector.Economy
             var value = Value;
             if (Count == 0) return value;
             _counts.Clear();
-            Count = 0;
-            Value = GameNumber.Zero;
-            Changed?.Invoke();
+            _value.Value = GameNumber.Zero;
+            _count.Value = 0;
             return value;
         }
     }

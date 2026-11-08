@@ -33,7 +33,7 @@ Assets/_Project/
     Fx/          GameFx (particles, shake, hit-stop, popups, toasts), GameAudio (generated sounds), ShapeSprites
     UI/          Hud, UpgradePanel, DebugPanel, UiFactory
     Editor/      VoidProspector.Editor.asmdef — EconomyExport menu
-Assets/Tests/EditMode/     VoidProspector.Tests.EditMode.asmdef (89 tests)
+Assets/Tests/EditMode/     VoidProspector.Tests.EditMode.asmdef (92 tests)
 tools/economy/             build_economy_xlsx.py
 ```
 
@@ -70,11 +70,18 @@ Rules that keep this working:
 
 - Installed: the **R3 core** (NuGet) and **R3.Unity** (git package). R3.Unity provides `.AddTo(Component)`, the Unity frame/time providers (time-based operators like `Delay`, `Debounce`, `ThrottleFirst` run on the main thread via `UnityTimeProvider`), uGUI bindings (`button.OnClickAsObservable()`, `SubscribeToText`) and the ObservableTracker window.
 - Gameplay time-based operators should use `UnityTimeProvider.Update` (scaled; respects hit-stop and debug speed) or `UnityTimeProvider.UpdateIgnoreTimeScale` for UI. Don't use R3 timers inside plain-C# game logic: logic stays tick-based so the simulator can fast-forward it.
-- Intended use: plain-C# models expose `ReactiveProperty<T>` / `ReadOnlyReactiveProperty<T>` (e.g. `Wallet.Credits`, `CargoHold.Count/Value`, `DepthProgress.Current`, `UpgradeTrack.Level`, auto-sell setting) and UI binds each label to the value it shows, replacing the `Changed` events + `Refresh()` pattern. Not converted yet (models still use `event Action Changed`).
+- **Model → UI pattern (in use):** each model keeps a private `ReactiveProperty<T>` and exposes two views:
+  - a plain getter for game logic and the simulator (`Wallet.Credits`, `Cargo.Count`, `Depths.Current`, `track.Level`, `Session.AutoSellBelow`);
+  - a `ReadOnlyReactiveProperty<T>` with the `Rx` suffix for UI binding (`CreditsRx`, `CountRx`/`ValueRx`/`CapacityRx`, `CurrentRx`/`DeepestRx`/`ProgressRx`, `LevelRx`, `AutoSellBelowRx`). It emits the current value on subscribe, then only real changes.
+  - One-off happenings (not state) are a `Subject` exposed as `Observable<T>`, e.g. `Upgrades.Bought`.
+  - Only the model sets values; never expose the writable `ReactiveProperty`. No `event Action Changed` in models anymore.
+- **UI binds each widget to the values it shows** (see `Hud.Bind`, `UpgradePanel.Bind`): `Observable.Merge(...)` when a widget redraws from several values, `CombineLatest` + `DistinctUntilChangedBy` when it derives something (an upgrade's quote from level + credits + buy mode) so it redraws only when the result changes. Because subscribe emits the current value, binding also draws the initial state; no separate `Refresh()`.
+- When a model updates two related properties, set them in an order that leaves subscribers seeing a consistent state (e.g. `CargoHold` sets `Value` before `Count`).
+- Button clicks stay as `Button.onClick` listeners via `UiFactory.Button` (the button owns them, nothing to dispose).
 - Every UI subscription is disposed with its owner: `.AddTo(this)` (R3.Unity) in MonoBehaviours, or a `CompositeDisposable` / `DisposableBag` in plain classes. Use R3.Unity's ObservableTracker window to find leaks.
 - Keep models usable without subscribers: setting a `ReactiveProperty` with no subscribers must stay cheap (the simulator sets values thousands of times).
 - Unlike classic Rx, errors don't complete the stream by default; handle exceptions in subscribers.
-- Asmdefs: `VoidProspector.asmdef` picks up `R3.dll` automatically (`overrideReferences: false`) and references `R3.Unity`. The test asmdef uses `overrideReferences: true`, so add `R3.dll` to its `precompiledReferences` when tests touch R3 types.
+- Asmdefs: `VoidProspector.asmdef` picks up `R3.dll` automatically (`overrideReferences: false`) and references `R3.Unity`. The test asmdef uses `overrideReferences: true` and lists `R3.dll` and `Microsoft.Bcl.TimeProvider.dll` in its `precompiledReferences`.
 - NuGetForUnity: manage via the **NuGet** menu → Manage NuGet Packages. DLLs go to `Assets/Packages/` (committed; `.dll` files go through Git LFS). R3.Unity needs the NuGet R3 core; update both together.
 
 ## UniTask

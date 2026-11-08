@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using System.Globalization;
+using R3;
 using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
@@ -31,26 +32,16 @@ namespace VoidProspector.UI
         GameRoot _root;
         GameSession Session => _root.Session;
         readonly List<Row> _rows = new List<Row>();
-        BuyMode _mode = BuyMode.One;
+        readonly ReactiveProperty<BuyMode> _mode = new ReactiveProperty<BuyMode>(BuyMode.One);
         TextMeshProUGUI _modeLabel;
 
         public void Init(GameRoot root, RectTransform area)
         {
             _root = root;
+            _mode.AddTo(this);
             Build(area);
-            Session.Wallet.Changed += Refresh;
-            Session.Upgrades.Bought += OnBought;
-            Refresh();
+            Bind();
         }
-
-        void OnDestroy()
-        {
-            if (_root == null || Session == null) return;
-            Session.Wallet.Changed -= Refresh;
-            Session.Upgrades.Bought -= OnBought;
-        }
-
-        void OnBought(UpgradeTrack track, int levels) => Refresh();
 
         void Build(RectTransform area)
         {
@@ -127,13 +118,13 @@ namespace VoidProspector.UI
 
         void OnCycleMode()
         {
-            _mode = _mode == BuyMode.One ? BuyMode.Ten : _mode == BuyMode.Ten ? BuyMode.Max : BuyMode.One;
-            Refresh();
+            var m = _mode.Value;
+            _mode.Value = m == BuyMode.One ? BuyMode.Ten : m == BuyMode.Ten ? BuyMode.Max : BuyMode.One;
         }
 
         void OnBuy(Row row)
         {
-            int bought = Session.Upgrades.TryBuy(row.track, _mode);
+            int bought = Session.Upgrades.TryBuy(row.track, _mode.Value);
             if (bought == 0)
             {
                 _root.Audio.Deny();
@@ -143,27 +134,48 @@ namespace VoidProspector.UI
             _root.Fx.Burst(_root.Ship.position, new Color(0.5f, 0.9f, 1f), 15, 4f, 0.15f);
         }
 
-        void Refresh()
+        /// <summary>
+        /// The mode label follows the buy mode. Each row's text follows its level; its button follows the quote
+        /// (level + credits + mode) and only redraws when the quote actually changes, not on every credit.
+        /// Subscriptions end when this component is destroyed.
+        /// </summary>
+        void Bind()
         {
-            _modeLabel.text = _mode == BuyMode.One ? "Buy ×1" : _mode == BuyMode.Ten ? "Buy ×10" : "Buy MAX";
+            _mode.Subscribe(m => _modeLabel.text = m == BuyMode.One ? "Buy ×1" : m == BuyMode.Ten ? "Buy ×10" : "Buy MAX")
+                .AddTo(this);
 
+            var credits = Session.Wallet.CreditsRx;
             foreach (var row in _rows)
             {
-                var t = row.track;
-                string next = t.IsMaxed ? "" : $" → {Describe(t.Effect, t.NextValue)}";
-                row.info.text = $"<b>{t.Definition.displayName}</b>  <size=26>Lv {t.Level}</size>\n<size=26>{Describe(t.Effect, t.Value)}{next}</size>";
+                var r = row;
+                var t = r.track;
+                t.LevelRx.Subscribe(_ => DrawInfo(r)).AddTo(this);
 
-                if (t.IsMaxed)
-                {
-                    row.buyLabel.text = "MAX";
-                    row.buy.interactable = false;
-                    continue;
-                }
-                var quote = Session.Upgrades.Quote(t, _mode);
-                string count = quote.count > 1 ? $"<size=26>×{quote.count}</size>  " : "";
-                row.buyLabel.text = $"{count}$ {NumberFormatter.Format(quote.cost)}";
-                row.buy.interactable = quote.affordable;
+                Observable.CombineLatest(t.LevelRx, credits, _mode, (_, c, m) => t.Quote(m, c))
+                    .DistinctUntilChangedBy(q => (q.count, q.cost, q.affordable))
+                    .Subscribe(q => DrawBuy(r, q))
+                    .AddTo(this);
             }
+        }
+
+        static void DrawInfo(Row row)
+        {
+            var t = row.track;
+            string next = t.IsMaxed ? "" : $" → {Describe(t.Effect, t.NextValue)}";
+            row.info.text = $"<b>{t.Definition.displayName}</b>  <size=26>Lv {t.Level}</size>\n<size=26>{Describe(t.Effect, t.Value)}{next}</size>";
+        }
+
+        static void DrawBuy(Row row, UpgradeQuote quote)
+        {
+            if (row.track.IsMaxed)
+            {
+                row.buyLabel.text = "MAX";
+                row.buy.interactable = false;
+                return;
+            }
+            string count = quote.count > 1 ? $"<size=26>×{quote.count}</size>  " : "";
+            row.buyLabel.text = $"{count}$ {NumberFormatter.Format(quote.cost)}";
+            row.buy.interactable = quote.affordable;
         }
 
         static string Describe(UpgradeEffect effect, double v)

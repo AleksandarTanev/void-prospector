@@ -1,4 +1,5 @@
 using System;
+using R3;
 using VoidProspector.Data;
 using VoidProspector.Economy;
 using VoidProspector.Mining;
@@ -35,11 +36,12 @@ namespace VoidProspector.Core
         public DepthProgress Depths { get; }
         public Random Rng { get; }
 
-        /// <summary>Chunks below this purity grade are sold the moment they're collected. 0 = off.</summary>
-        public int AutoSellBelow { get; private set; }
+        readonly ReactiveProperty<int> _autoSellBelow = new ReactiveProperty<int>(0);
 
-        /// <summary>Raised when something not covered by the wallet/cargo/upgrade/depth events changes (auto-sell setting).</summary>
-        public event Action SettingsChanged;
+        /// <summary>Chunks below this purity grade are sold the moment they're collected. 0 = off.</summary>
+        public int AutoSellBelow => _autoSellBelow.Value;
+        /// <summary>Auto-sell setting for UI binding; emits the current value on subscribe, then every change.</summary>
+        public ReadOnlyReactiveProperty<int> AutoSellBelowRx => _autoSellBelow;
 
         public GameSession(GameDatabase database, SectorDefinition sector, int seed)
         {
@@ -51,10 +53,8 @@ namespace VoidProspector.Core
             Cargo = new CargoHold(CargoCapacity);
             Depths = new DepthProgress(sector.maxDepth, database.mining != null ? database.mining.meteorsPerDepth : 15);
 
-            Upgrades.Bought += (track, _) =>
-            {
-                if (track.Effect == UpgradeEffect.CargoCapacity) Cargo.Capacity = CargoCapacity;
-            };
+            // The session owns both sides, so this subscription lives as long as the session.
+            Upgrades.Get(UpgradeEffect.CargoCapacity)?.LevelRx.Subscribe(_ => Cargo.Capacity = CargoCapacity);
         }
 
         public MiningSettings Mining => Database.mining;
@@ -110,9 +110,7 @@ namespace VoidProspector.Core
         public void SetAutoSellBelow(int grade)
         {
             grade = Math.Max(0, Math.Min(grade, Purity.Count));
-            if (grade == AutoSellBelow) return;
-            AutoSellBelow = grade;
-            SettingsChanged?.Invoke();
+            _autoSellBelow.Value = grade;
         }
 
         /// <summary>Counts a broken meteor toward unlocking the next depth.</summary>

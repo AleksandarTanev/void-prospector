@@ -1,4 +1,5 @@
 using System;
+using R3;
 using VoidProspector.Core;
 
 namespace VoidProspector.Economy
@@ -6,11 +7,13 @@ namespace VoidProspector.Economy
     /// <summary>The player's credits.</summary>
     public sealed class Wallet
     {
-        public event Action Changed;
+        readonly ReactiveProperty<GameNumber> _credits;
 
-        public GameNumber Credits { get; private set; }
+        public Wallet(GameNumber startingCredits = default) => _credits = new ReactiveProperty<GameNumber>(startingCredits);
 
-        public Wallet(GameNumber startingCredits = default) => Credits = startingCredits;
+        public GameNumber Credits => _credits.Value;
+        /// <summary>Credits for UI binding; emits the current value on subscribe, then every change.</summary>
+        public ReadOnlyReactiveProperty<GameNumber> CreditsRx => _credits;
 
         public bool CanAfford(GameNumber amount) => Credits >= amount;
 
@@ -18,16 +21,14 @@ namespace VoidProspector.Economy
         {
             if (amount < GameNumber.Zero) throw new ArgumentOutOfRangeException(nameof(amount), "Use TrySpend to remove credits");
             if (amount == GameNumber.Zero) return;
-            Credits += amount;
-            Changed?.Invoke();
+            _credits.Value = Credits + amount;
         }
 
         public bool TrySpend(GameNumber amount)
         {
             if (amount < GameNumber.Zero) throw new ArgumentOutOfRangeException(nameof(amount));
             if (!CanAfford(amount)) return false;
-            Credits -= amount;
-            Changed?.Invoke();
+            _credits.Value = Credits - amount;
             return true;
         }
     }

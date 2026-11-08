@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using R3;
 using VoidProspector.Data;
 
 namespace VoidProspector.Economy
@@ -7,8 +8,13 @@ namespace VoidProspector.Economy
     /// <summary>All upgrade tracks of a session, in database order. Buying spends credits from the wallet.</summary>
     public sealed class Upgrades
     {
-        /// <summary>Raised after a purchase with the track and the number of levels bought.</summary>
-        public event Action<UpgradeTrack, int> Bought;
+        readonly Subject<(UpgradeTrack track, int levels)> _bought = new Subject<(UpgradeTrack, int)>();
+
+        /// <summary>
+        /// Emits after a purchase with the track and the number of levels bought (0 for <see cref="SetLevel"/>).
+        /// An event, not a state: use <see cref="UpgradeTrack.LevelRx"/> to show a level.
+        /// </summary>
+        public Observable<(UpgradeTrack track, int levels)> Bought => _bought;
 
         readonly List<UpgradeTrack> _tracks = new List<UpgradeTrack>();
         readonly Dictionary<UpgradeEffect, UpgradeTrack> _byEffect = new Dictionary<UpgradeEffect, UpgradeTrack>();
@@ -49,7 +55,7 @@ namespace VoidProspector.Economy
             if (!quote.affordable || quote.count == 0) return 0;
             if (!_wallet.TrySpend(quote.cost)) return 0;
             track.AddLevels(quote.count);
-            Bought?.Invoke(track, quote.count);
+            _bought.OnNext((track, quote.count));
             return quote.count;
         }
 
@@ -59,7 +65,7 @@ namespace VoidProspector.Economy
             var t = Get(effect);
             if (t == null) return;
             t.SetLevel(level);
-            Bought?.Invoke(t, 0);
+            _bought.OnNext((t, 0));
         }
     }
 }

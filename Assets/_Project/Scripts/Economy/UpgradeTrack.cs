@@ -1,4 +1,5 @@
 using System;
+using R3;
 using VoidProspector.Core;
 using VoidProspector.Data;
 
@@ -24,13 +25,17 @@ namespace VoidProspector.Economy
     /// <summary>Runtime state of one upgrade: its level, the cost of the next levels and its current effect.</summary>
     public sealed class UpgradeTrack
     {
+        readonly ReactiveProperty<int> _level;
+
         public UpgradeDefinition Definition { get; }
-        public int Level { get; private set; }
+        public int Level => _level.Value;
+        /// <summary>Level for UI binding; emits the current value on subscribe, then every change.</summary>
+        public ReadOnlyReactiveProperty<int> LevelRx => _level;
 
         public UpgradeTrack(UpgradeDefinition definition, int level = 0)
         {
             Definition = definition ?? throw new ArgumentNullException(nameof(definition));
-            Level = Math.Max(0, Math.Min(level, definition.maxLevel));
+            _level = new ReactiveProperty<int>(Math.Max(0, Math.Min(level, definition.maxLevel)));
         }
 
         public UpgradeEffect Effect => Definition.effect;
@@ -77,8 +82,8 @@ namespace VoidProspector.Economy
         }
 
         /// <summary>Raises the level. Payment is handled by <see cref="Upgrades"/>.</summary>
-        internal void AddLevels(int count) => Level = Math.Min(Definition.maxLevel, Level + Math.Max(0, count));
+        internal void AddLevels(int count) => _level.Value = Math.Min(Definition.maxLevel, Level + Math.Max(0, count));
 
-        internal void SetLevel(int level) => Level = Math.Max(0, Math.Min(level, Definition.maxLevel));
+        internal void SetLevel(int level) => _level.Value = Math.Max(0, Math.Min(level, Definition.maxLevel));
     }
 }

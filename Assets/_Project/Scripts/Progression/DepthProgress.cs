@@ -1,4 +1,5 @@
 using System;
+using R3;
 
 namespace VoidProspector.Progression
 {
@@ -8,14 +9,21 @@ namespace VoidProspector.Progression
     /// </summary>
     public sealed class DepthProgress
     {
-        public event Action Changed;
+        readonly ReactiveProperty<int> _current = new ReactiveProperty<int>(0);
+        readonly ReactiveProperty<int> _deepest = new ReactiveProperty<int>(0);
+        readonly ReactiveProperty<int> _progress = new ReactiveProperty<int>(0);
 
         public int MaxDepth { get; }          // number of depth levels in the sector
         public int MeteorsPerDepth { get; }
-        public int Current { get; private set; }
-        public int Deepest { get; private set; }
+        public int Current => _current.Value;
+        public int Deepest => _deepest.Value;
         /// <summary>Meteors broken at the deepest unlocked depth since it was unlocked.</summary>
-        public int Progress { get; private set; }
+        public int Progress => _progress.Value;
+
+        // UI bindings: each emits the current value on subscribe, then every change.
+        public ReadOnlyReactiveProperty<int> CurrentRx => _current;
+        public ReadOnlyReactiveProperty<int> DeepestRx => _deepest;
+        public ReadOnlyReactiveProperty<int> ProgressRx => _progress;
 
         public DepthProgress(int maxDepth, int meteorsPerDepth)
         {
@@ -31,8 +39,7 @@ namespace VoidProspector.Progression
         public bool TrySetDepth(int depth)
         {
             if (depth < 0 || depth > Deepest || depth == Current) return false;
-            Current = depth;
-            Changed?.Invoke();
+            _current.Value = depth;
             return true;
         }
 
@@ -40,25 +47,22 @@ namespace VoidProspector.Progression
         public bool RegisterBreak(int depth)
         {
             if (depth != Deepest || IsDeepestUnlocked) return false;
-            Progress++;
-            if (Progress < MeteorsPerDepth)
+            if (Progress + 1 < MeteorsPerDepth)
             {
-                Changed?.Invoke();
+                _progress.Value = Progress + 1;
                 return false;
             }
-            Deepest++;
-            Progress = 0;
-            Changed?.Invoke();
+            _progress.Value = 0;
+            _deepest.Value = Deepest + 1;
             return true;
         }
 
         /// <summary>Unlocks up to a depth without breaking meteors (debug tools and, later, loading a save).</summary>
         public void Unlock(int deepest, int current)
         {
-            Deepest = Math.Max(0, Math.Min(deepest, MaxDepth - 1));
-            Current = Math.Max(0, Math.Min(current, Deepest));
-            Progress = 0;
-            Changed?.Invoke();
+            _progress.Value = 0;
+            _deepest.Value = Math.Max(0, Math.Min(deepest, MaxDepth - 1));
+            _current.Value = Math.Max(0, Math.Min(current, Deepest));
         }
     }
 }

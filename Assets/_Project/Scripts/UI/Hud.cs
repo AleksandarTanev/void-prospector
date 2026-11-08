@@ -1,3 +1,4 @@
+using R3;
 using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
@@ -40,20 +41,7 @@ namespace VoidProspector.UI
             _root = root;
             UiFactory.EnsureEventSystem();
             Build();
-            Session.Wallet.Changed += Refresh;
-            Session.Cargo.Changed += Refresh;
-            Session.Depths.Changed += Refresh;
-            Session.SettingsChanged += Refresh;
-            Refresh();
-        }
-
-        void OnDestroy()
-        {
-            if (_root == null || Session == null) return;
-            Session.Wallet.Changed -= Refresh;
-            Session.Cargo.Changed -= Refresh;
-            Session.Depths.Changed -= Refresh;
-            Session.SettingsChanged -= Refresh;
+            Bind();
         }
 
         void Build()
@@ -166,27 +154,62 @@ namespace VoidProspector.UI
             Session.SetAutoSellBelow(next);
         }
 
-        void Refresh()
+        /// <summary>
+        /// Each widget listens only to the values it shows. Reactive properties emit their current value on
+        /// subscribe, so this also draws the initial state. Subscriptions end when this component is destroyed.
+        /// </summary>
+        void Bind()
         {
             var cargo = Session.Cargo;
             var depths = Session.Depths;
-            _credits.text = "$ " + NumberFormatter.Format(Session.Wallet.Credits);
 
             _sector.text = $"{Session.Sector.index}. {Session.Sector.displayName}";
+
+            Session.Wallet.CreditsRx
+                .Subscribe(credits => _credits.text = "$ " + NumberFormatter.Format(credits))
+                .AddTo(this);
+
+            Observable.Merge(depths.CurrentRx, depths.DeepestRx, depths.ProgressRx)
+                .Subscribe(_ => DrawDepth())
+                .AddTo(this);
+
+            Observable.Merge(cargo.CountRx, cargo.CapacityRx)
+                .Subscribe(_ => DrawCargo())
+                .AddTo(this);
+
+            Observable.Merge(cargo.CountRx.AsUnitObservable(), cargo.ValueRx.AsUnitObservable())
+                .Subscribe(_ => DrawSell())
+                .AddTo(this);
+
+            Session.AutoSellBelowRx
+                .Subscribe(below => _autoSellLabel.text = below == 0
+                    ? "Auto-sell\n<size=26>off</size>"
+                    : $"Auto-sell\n<size=26>below {Session.Purity[below].name}</size>")
+                .AddTo(this);
+        }
+
+        void DrawDepth()
+        {
+            var depths = Session.Depths;
             _depth.text = $"Depth {depths.Current + 1}<size=26>/{depths.MaxDepth}</size>";
             _shallower.interactable = depths.CanGoShallower;
             _deeper.interactable = depths.CanGoDeeper;
             _depthFill.anchorMax = new Vector2(depths.ProgressFraction, 1);
+        }
 
+        void DrawCargo()
+        {
+            var cargo = Session.Cargo;
             _cargoText.text = $"Cargo {cargo.Count}/{cargo.Capacity}";
             _cargoFill.anchorMax = new Vector2(cargo.Fill, 1);
             _cargoFillImage.color = cargo.IsFull ? CargoFullColor : CargoColor;
+        }
 
+        void DrawSell()
+        {
+            var cargo = Session.Cargo;
             _sellLabel.text = cargo.IsEmpty ? "SELL" : $"SELL  $ {NumberFormatter.Format(cargo.Value)}";
             _sell.interactable = !cargo.IsEmpty;
-
-            int below = Session.AutoSellBelow;
-            _autoSellLabel.text = below == 0 ? "Auto-sell\n<size=26>off</size>" : $"Auto-sell\n<size=26>below {Session.Purity[below].name}</size>";
         }
     }
 }

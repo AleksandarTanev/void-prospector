@@ -1,6 +1,7 @@
 using System;
 using System.Linq;
 using NUnit.Framework;
+using R3;
 using UnityEditor;
 using VoidProspector.Core;
 using VoidProspector.Data;
@@ -16,7 +17,7 @@ namespace VoidProspector.Tests
         {
             var w = new Wallet();
             int changes = 0;
-            w.Changed += () => changes++;
+            using var sub = w.CreditsRx.Subscribe(_ => changes++);   // emits the current value on subscribe
 
             w.Add(100);
             Assert.AreEqual(100d, w.Credits.Value);
@@ -24,7 +25,7 @@ namespace VoidProspector.Tests
             Assert.AreEqual(60d, w.Credits.Value);
             Assert.IsFalse(w.TrySpend(61));
             Assert.AreEqual(60d, w.Credits.Value);
-            Assert.AreEqual(2, changes);
+            Assert.AreEqual(3, changes, "initial value + 2 changes; a failed spend emits nothing");
         }
 
         [Test]
@@ -84,6 +85,18 @@ namespace VoidProspector.Tests
             Assert.IsTrue(hold.IsEmpty);
             Assert.AreEqual(0d, hold.Value.Value);
             Assert.AreEqual(0, hold.CountOf(_copper));
+        }
+
+        [Test]
+        public void Bindings_SeeConsistentCountAndValue()
+        {
+            var hold = new CargoHold(10);
+            var seen = new System.Collections.Generic.List<(int count, double value)>();
+            using var sub = hold.CountRx.Subscribe(n => seen.Add((n, hold.Value.Value)));
+            hold.TryAdd(new ChunkData(_copper, 0, 5));
+            hold.TryAdd(new ChunkData(_copper, 0, 5));
+            hold.TakeAll();
+            CollectionAssert.AreEqual(new[] { (0, 0d), (1, 5d), (2, 10d), (0, 0d) }, seen);
         }
     }
 

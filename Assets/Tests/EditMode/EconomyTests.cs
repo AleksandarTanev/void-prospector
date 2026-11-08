@@ -1,5 +1,6 @@
 using System.Linq;
 using NUnit.Framework;
+using R3;
 using UnityEditor;
 using UnityEngine;
 using VoidProspector.Core;
@@ -73,8 +74,9 @@ namespace VoidProspector.Tests
             var wallet = new Wallet(100);
             var upgrades = new Upgrades(new[] { _def }, wallet);
             var track = upgrades.Get(UpgradeEffect.DrillDamage);
-            int events = 0;
-            upgrades.Bought += (_, __) => events++;
+            int events = 0, levelChanges = 0;
+            using var bought = upgrades.Bought.Subscribe(_ => events++);
+            using var level = track.LevelRx.Subscribe(_ => levelChanges++);
 
             Assert.AreEqual(3, upgrades.TryBuy(track, BuyMode.Max));
             Assert.AreEqual(30d, wallet.Credits.Value);
@@ -82,6 +84,7 @@ namespace VoidProspector.Tests
             Assert.AreEqual(4d, track.Value);
             Assert.AreEqual(0, upgrades.TryBuy(track, BuyMode.One), "80 > 30");
             Assert.AreEqual(1, events);
+            Assert.AreEqual(2, levelChanges, "initial value + one purchase");
         }
 
         [Test]
@@ -128,6 +131,23 @@ namespace VoidProspector.Tests
             Assert.IsFalse(d.RegisterBreak(1));
             Assert.AreEqual(1f, d.ProgressFraction);
         }
+
+        [Test]
+        public void Bindings_EmitOnlyOnChange()
+        {
+            var d = new DepthProgress(3, 2);
+            int current = 0, deepest = 0, progress = 0;
+            using var a = d.CurrentRx.Subscribe(_ => current++);
+            using var b = d.DeepestRx.Subscribe(_ => deepest++);
+            using var c = d.ProgressRx.Subscribe(_ => progress++);
+            d.RegisterBreak(0);           // progress 1
+            d.RegisterBreak(0);           // unlock: progress 0, deepest 1
+            d.TrySetDepth(1);
+            d.TrySetDepth(1);             // no change
+            Assert.AreEqual(2, current, "initial + one move");
+            Assert.AreEqual(2, deepest, "initial + one unlock");
+            Assert.AreEqual(3, progress, "initial + 1 + reset to 0");
+        }
     }
 
     /// <summary>Session and pacing checks against the real data assets.</summary>
@@ -152,6 +172,20 @@ namespace VoidProspector.Tests
             s.Wallet.Add(cargo.NextCost);
             Assert.AreEqual(1, s.Upgrades.TryBuy(cargo, BuyMode.One));
             Assert.AreEqual(60, s.Cargo.Capacity);
+            s.Upgrades.SetLevel(UpgradeEffect.CargoCapacity, 3);
+            Assert.AreEqual(80, s.Cargo.Capacity, "setting a level without buying (save load) also updates the hold");
+        }
+
+        [Test]
+        public void AutoSellSetting_EmitsOnChange()
+        {
+            var s = new GameSession(_db, _sector, 1);
+            var seen = new System.Collections.Generic.List<int>();
+            using var sub = s.AutoSellBelowRx.Subscribe(seen.Add);
+            s.SetAutoSellBelow(2);
+            s.SetAutoSellBelow(2);
+            s.SetAutoSellBelow(0);
+            CollectionAssert.AreEqual(new[] { 0, 2, 0 }, seen);
         }
 
         [Test]
