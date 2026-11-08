@@ -1,0 +1,36 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 7831ce7330c4aaa48a838cee6be3795a, type: 3}
+  m_Name: GameDatabase
+  m_EditorClassIdentifier: VoidProspector::VoidProspector.Data.GameDatabase
+  minerals:
+  - {fileID: 11400000, guid: 03b286707edf3f74c98f0b7854e57f24, type: 2}
+  - {fileID: 11400000, guid: 79e76ec4d8c1fa0469a6305d64e0dd50, type: 2}
+  - {fileID: 11400000, guid: 1ec2e228a89ae4046a2153ef1c20ec36, type: 2}
+  - {fileID: 11400000, guid: 33941faba2cd45244b23e3c23b4b9295, type: 2}
+  purity: {fileID: 11400000, guid: c91df47a841889343bb9919ddedb5234, type: 2}
+  meteorSizes:
+  - {fileID: 11400000, guid: cf65096e8d8a887439f40700c10fe225, type: 2}
+  - {fileID: 11400000, guid: 14ae7abeee7077244bdc88722af9e54e, type: 2}
+  - {fileID: 11400000, guid: b254bcba52023874788be485e420f87c, type: 2}
+  - {fileID: 11400000, guid: 2aabb79d1d6811b4d83a838f865bc210, type: 2}
+  - {fileID: 11400000, guid: 3477890a71007be40899adf3d336c61b, type: 2}
+  meteorTypes:
+  - {fileID: 11400000, guid: ca813b2a5584ea24990fdc46a0767f54, type: 2}
+  sectors:
+  - {fileID: 11400000, guid: 4eab5782cbb674e458b24ee8be3c4098, type: 2}
+  upgrades:
+  - {fileID: 11400000, guid: 5da46612da2e3274fa2885c849ebfb1b, type: 2}
+  - {fileID: 11400000, guid: 4c1a85d366863f54d9a3328256269d96, type: 2}
+  - {fileID: 11400000, guid: d16226d63063d4140bfa847bce6a67a3, type: 2}
+  - {fileID: 11400000, guid: 86b29af507029f542b307c5fbd53a840, type: 2}
+  - {fileID: 11400000, guid: a9a0de46289ae224a844d82084015f63, type: 2}

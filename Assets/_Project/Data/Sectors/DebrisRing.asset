@@ -1,0 +1,26 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: aee95da3d341e3b4a84f2ffaa39b9a0a, type: 3}
+  m_Name: DebrisRing
+  m_EditorClassIdentifier: VoidProspector::VoidProspector.Data.SectorDefinition
+  id: debris_ring
+  displayName: Debris Ring
+  index: 1
+  baseHp: 10
+  maxDepth: 10
+  meteorTypes:
+  - type: {fileID: 11400000, guid: ca813b2a5584ea24990fdc46a0767f54, type: 2}
+    weight: 1
+  signatureMineral: {fileID: 11400000, guid: 79e76ec4d8c1fa0469a6305d64e0dd50, type: 2}
+  unlockCost: []
+  depthHpGrowth: 1.18
+  depthValueStep: 0.15

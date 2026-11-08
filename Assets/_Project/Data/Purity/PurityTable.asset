@@ -1,0 +1,50 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 7f4a190f63fbe4641878c8e9f4677cf4, type: 3}
+  m_Name: PurityTable
+  m_EditorClassIdentifier: VoidProspector::VoidProspector.Data.PurityTable
+  grades:
+  - name: Crude
+    minPurity: 0
+    maxPurity: 39
+    valueMultiplier: 1
+    dropWeight: 60
+    glow: 0
+    tint: {r: 0.6, g: 0.6, b: 0.6, a: 1}
+  - name: Standard
+    minPurity: 40
+    maxPurity: 69
+    valueMultiplier: 2
+    dropWeight: 28
+    glow: 0.15
+    tint: {r: 1, g: 1, b: 1, a: 1}
+  - name: Refined
+    minPurity: 70
+    maxPurity: 89
+    valueMultiplier: 5
+    dropWeight: 9
+    glow: 0.45
+    tint: {r: 1, g: 1, b: 1, a: 1}
+  - name: Pristine
+    minPurity: 90
+    maxPurity: 98
+    valueMultiplier: 15
+    dropWeight: 2.7
+    glow: 0.8
+    tint: {r: 1, g: 1, b: 1, a: 1}
+  - name: Flawless
+    minPurity: 99
+    maxPurity: 100
+    valueMultiplier: 50
+    dropWeight: 0.3
+    glow: 1.2
+    tint: {r: 1, g: 1, b: 1, a: 1}
