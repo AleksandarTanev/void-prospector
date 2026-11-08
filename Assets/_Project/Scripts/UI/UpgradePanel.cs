@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using System.Globalization;
+using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
 using VoidProspector.Core;
@@ -22,16 +23,16 @@ namespace VoidProspector.UI
         class Row
         {
             public UpgradeTrack track;
-            public Text info;
+            public TextMeshProUGUI info;
             public Button buy;
-            public Text buyLabel;
+            public TextMeshProUGUI buyLabel;
         }
 
         GameRoot _root;
         GameSession Session => _root.Session;
         readonly List<Row> _rows = new List<Row>();
         BuyMode _mode = BuyMode.One;
-        Text _modeLabel;
+        TextMeshProUGUI _modeLabel;
 
         public void Init(GameRoot root, RectTransform area)
         {
@@ -53,8 +54,8 @@ namespace VoidProspector.UI
 
         void Build(RectTransform area)
         {
-            var title = UiFactory.Text(area, "Title", "UPGRADES", 34, TextAnchor.MiddleLeft, new Color(0.75f, 0.85f, 1f));
-            title.fontStyle = FontStyle.Bold;
+            var title = UiFactory.Text(area, "Title", "UPGRADES", 34, TextAlignmentOptions.Left, new Color(0.75f, 0.85f, 1f));
+            title.fontStyle = FontStyles.Bold;
             var trt = title.rectTransform;
             trt.anchorMin = new Vector2(0, 1);
             trt.anchorMax = new Vector2(0.6f, 1);
@@ -108,7 +109,7 @@ namespace VoidProspector.UI
             bg.gameObject.AddComponent<LayoutElement>().preferredHeight = RowHeight;
             var rt = bg.rectTransform;
 
-            var info = UiFactory.Text(rt, "Info", "", 34, TextAnchor.MiddleLeft, Color.white);
+            var info = UiFactory.Text(rt, "Info", "", 34, TextAlignmentOptions.Left, Color.white);
             info.rectTransform.anchorMin = Vector2.zero;
             info.rectTransform.anchorMax = new Vector2(0.62f, 1);
             info.rectTransform.offsetMin = new Vector2(24, 0);

@@ -1,3 +1,4 @@
+using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
 using VoidProspector.Core;
@@ -23,12 +24,12 @@ namespace VoidProspector.UI
         static readonly Color DepthColor = new Color(0.6f, 0.9f, 1f);
 
         public RectTransform PopupLayer { get; private set; }
-        public Text Toast { get; private set; }
+        public TextMeshProUGUI Toast { get; private set; }
 
         GameRoot _root;
         GameSession Session => _root.Session;
 
-        Text _credits, _sector, _depth, _cargoText, _sellLabel, _autoSellLabel;
+        TextMeshProUGUI _credits, _sector, _depth, _cargoText, _sellLabel, _autoSellLabel;
         Button _sell, _shallower, _deeper;
         RectTransform _cargoFill, _depthFill;
         Image _cargoFillImage;
@@ -65,9 +66,9 @@ namespace VoidProspector.UI
 
             BuildTopBar(canvas);
 
-            Toast = UiFactory.Text(canvas, "Toast", "", 56, TextAnchor.MiddleCenter, Color.white);
-            Toast.fontStyle = FontStyle.Bold;
-            Toast.gameObject.AddComponent<Outline>().effectColor = new Color(0, 0, 0, 0.8f);
+            Toast = UiFactory.Text(canvas, "Toast", "", 56, TextAlignmentOptions.Center, Color.white);
+            Toast.fontStyle = FontStyles.Bold;
+            UiFactory.AddOutline(Toast);
             var trt = Toast.rectTransform;
             UiFactory.Strip(trt, true, 90);
             trt.offsetMin += new Vector2(0, -TopBarHeight - 20);
@@ -83,19 +84,19 @@ namespace VoidProspector.UI
             var top = UiFactory.Panel("Top Bar", canvas, PanelColor).rectTransform;
             UiFactory.Strip(top, true, TopBarHeight);
 
-            _credits = UiFactory.Text(top, "Credits", "$ 0", 72, TextAnchor.MiddleLeft, CreditsColor);
-            _credits.fontStyle = FontStyle.Bold;
+            _credits = UiFactory.Text(top, "Credits", "$ 0", 72, TextAlignmentOptions.Left, CreditsColor);
+            _credits.fontStyle = FontStyles.Bold;
             UiFactory.PlaceFromBottom(_credits.rectTransform, 0f, 0.5f, 0, TopBarHeight, 40);
 
-            _sector = UiFactory.Text(top, "Sector", "", 34, TextAnchor.MiddleCenter, new Color(0.75f, 0.85f, 1f));
+            _sector = UiFactory.Text(top, "Sector", "", 34, TextAlignmentOptions.Center, new Color(0.75f, 0.85f, 1f));
             UiFactory.PlaceFromBottom(_sector.rectTransform, 0.5f, 1f, 140, 50, 30);
 
             _shallower = UiFactory.Button(top, "Shallower", ToggleColor, () => Session.Depths.TrySetDepth(Session.Depth - 1), out var lessLabel, 44);
             lessLabel.text = "<";
             UiFactory.PlaceFromBottom((RectTransform)_shallower.transform, 0.5f, 0.6f, 40, 90, 8);
 
-            _depth = UiFactory.Text(top, "Depth", "", 40, TextAnchor.MiddleCenter, DepthColor);
-            _depth.fontStyle = FontStyle.Bold;
+            _depth = UiFactory.Text(top, "Depth", "", 40, TextAlignmentOptions.Center, DepthColor);
+            _depth.fontStyle = FontStyles.Bold;
             UiFactory.PlaceFromBottom(_depth.rectTransform, 0.6f, 0.9f, 52, 80, 0);
 
             _deeper = UiFactory.Button(top, "Deeper", ToggleColor, () => Session.Depths.TrySetDepth(Session.Depth + 1), out var moreLabel, 44);
@@ -117,7 +118,7 @@ namespace VoidProspector.UI
             var bottom = UiFactory.Panel("Bottom Panel", canvas, PanelColor).rectTransform;
             UiFactory.Strip(bottom, false, BottomPanelHeight);
 
-            _cargoText = UiFactory.Text(bottom, "Cargo", "", 36, TextAnchor.MiddleLeft, Color.white);
+            _cargoText = UiFactory.Text(bottom, "Cargo", "", 36, TextAlignmentOptions.Left, Color.white);
             UiFactory.PlaceFromBottom(_cargoText.rectTransform, 0f, 0.35f, 570, 56, 40);
 
             var cargoBg = UiFactory.Panel("Cargo Bar", bottom, new Color(1, 1, 1, 0.12f)).rectTransform;
@@ -130,7 +131,7 @@ namespace VoidProspector.UI
             _cargoFillImage.color = CargoColor;
 
             _sell = UiFactory.Button(bottom, "Sell", SellColor, OnSell, out _sellLabel, 52);
-            _sellLabel.fontStyle = FontStyle.Bold;
+            _sellLabel.fontStyle = FontStyles.Bold;
             UiFactory.PlaceFromBottom((RectTransform)_sell.transform, 0f, 0.7f, 440, 115, 30);
             ((RectTransform)_sell.transform).offsetMin = new Vector2(40, 440);
 

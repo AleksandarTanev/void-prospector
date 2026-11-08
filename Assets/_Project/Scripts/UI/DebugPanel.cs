@@ -1,3 +1,4 @@
+using TMPro;
 using UnityEngine;
 using UnityEngine.SceneManagement;
 using UnityEngine.UI;
@@ -12,7 +13,7 @@ namespace VoidProspector.UI
 
         GameRoot _root;
         RectTransform _panel;
-        Text _speedLabel;
+        TextMeshProUGUI _speedLabel;
 
         public void Init(GameRoot root, RectTransform canvas)
         {
@@ -41,7 +42,7 @@ namespace VoidProspector.UI
             _panel.gameObject.SetActive(false);
         }
 
-        Text AddButton(string label, UnityEngine.Events.UnityAction action, ref int index)
+        TextMeshProUGUI AddButton(string label, UnityEngine.Events.UnityAction action, ref int index)
         {
             var b = UiFactory.Button(_panel, label, DevColor, action, out var text, 30);
             var rt = (RectTransform)b.transform;

@@ -1,6 +1,6 @@
 using System.Collections.Generic;
+using TMPro;
 using UnityEngine;
-using UnityEngine.UI;
 using VoidProspector.Core;
 using VoidProspector.UI;
 
@@ -11,7 +11,7 @@ namespace VoidProspector.Fx
     {
         class Popup
         {
-            public Text text;
+            public TextMeshProUGUI text;
             public Vector3 world;
             public float age;
             public float life;
@@ -26,13 +26,13 @@ namespace VoidProspector.Fx
         float _lastCargoFull = -10f;
 
         RectTransform _layer;
-        Text _toast;
+        TextMeshProUGUI _toast;
         float _toastAge = 99f;
         Color _toastColor;
         readonly List<Popup> _active = new List<Popup>();
         readonly Stack<Popup> _pool = new Stack<Popup>();
 
-        public void Init(Camera cam, Material particleMaterial, RectTransform popupLayer, Text toast)
+        public void Init(Camera cam, Material particleMaterial, RectTransform popupLayer, TextMeshProUGUI toast)
         {
             _cam = cam;
             _camBase = cam.transform.position;
@@ -142,10 +142,10 @@ namespace VoidProspector.Fx
 
         Popup NewPopup()
         {
-            var t = UiFactory.Text(_layer, "Popup", "", 36, TextAnchor.MiddleCenter, Color.white);
-            t.fontStyle = FontStyle.Bold;
+            var t = UiFactory.Text(_layer, "Popup", "", 36, TextAlignmentOptions.Center, Color.white);
+            t.fontStyle = FontStyles.Bold;
             t.rectTransform.sizeDelta = new Vector2(300, 80);
-            t.gameObject.AddComponent<Outline>().effectColor = new Color(0, 0, 0, 0.7f);
+            UiFactory.AddOutline(t);
             return new Popup { text = t };
         }
 

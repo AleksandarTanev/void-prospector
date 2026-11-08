@@ -1,3 +1,4 @@
+using TMPro;
 using UnityEngine;
 using UnityEngine.Events;
 using UnityEngine.EventSystems;
@@ -11,8 +12,20 @@ namespace VoidProspector.UI
     {
         public static readonly Vector2 ReferenceResolution = new Vector2(1080, 1920);
 
-        static Font _font;
-        public static Font Font => _font != null ? _font : (_font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf"));
+        /// <summary>Path of the outline preset that ships with TMP Essential Resources (inside a Resources folder).</summary>
+        const string OutlineMaterialPath = "Fonts & Materials/LiberationSans SDF - Outline";
+
+        static Material _outline;
+
+        /// <summary>The default font's material with a dark outline, for text drawn over the game (popups, toasts).</summary>
+        public static Material OutlineMaterial
+        {
+            get
+            {
+                if (_outline == null) _outline = Resources.Load<Material>(OutlineMaterialPath);
+                return _outline;
+            }
+        }
 
         public static void EnsureEventSystem()
         {
@@ -50,22 +63,30 @@ namespace VoidProspector.UI
             return img;
         }
 
-        public static Text Text(Transform parent, string name, string text, int size, TextAnchor anchor, Color color)
+        /// <summary>A TextMeshPro label with the default font, no wrapping and overflow allowed (sizes are in reference pixels).</summary>
+        public static TextMeshProUGUI Text(Transform parent, string name, string text, float size, TextAlignmentOptions alignment, Color color)
         {
-            var t = Rect(name, parent).gameObject.AddComponent<Text>();
-            t.font = Font;
+            var t = Rect(name, parent).gameObject.AddComponent<TextMeshProUGUI>();
             t.text = text;
             t.fontSize = size;
-            t.alignment = anchor;
+            t.alignment = alignment;
             t.color = color;
             t.raycastTarget = false;
-            t.supportRichText = true;
-            t.horizontalOverflow = HorizontalWrapMode.Overflow;
-            t.verticalOverflow = VerticalWrapMode.Overflow;
+            t.richText = true;
+            t.textWrappingMode = TextWrappingModes.NoWrap;
+            t.overflowMode = TextOverflowModes.Overflow;
             return t;
         }
 
-        public static Button Button(Transform parent, string name, Color color, UnityAction onClick, out Text label, int fontSize)
+        /// <summary>Gives a label a dark outline so it reads over the meteor field.</summary>
+        public static void AddOutline(TMP_Text t)
+        {
+            var mat = OutlineMaterial;
+            if (mat != null) t.fontSharedMaterial = mat;
+            else Debug.LogWarning($"UiFactory: outline material '{OutlineMaterialPath}' not found; import TMP Essential Resources");
+        }
+
+        public static Button Button(Transform parent, string name, Color color, UnityAction onClick, out TextMeshProUGUI label, int fontSize)
         {
             var img = Panel(name, parent, color);
             var b = img.gameObject.AddComponent<Button>();
@@ -77,7 +98,7 @@ namespace VoidProspector.UI
             b.colors = colors;
             b.onClick.AddListener(onClick);
 
-            label = Text(img.transform, "Label", name, fontSize, TextAnchor.MiddleCenter, Color.white);
+            label = Text(img.transform, "Label", name, fontSize, TextAlignmentOptions.Center, Color.white);
             Stretch(label.rectTransform);
             return b;
         }
