@@ -1,0 +1,112 @@
+# ------------------------------------------------------------------
+# Line endings: let git normalise text files
+# ------------------------------------------------------------------
+* text=auto
+
+# Code and text
+*.cs        text diff=csharp
+*.shader    text
+*.hlsl      text
+*.cginc     text
+*.compute   text
+*.json      text
+*.md        text
+*.txt       text
+*.xml       text
+*.yml       text
+*.yaml      text
+*.asmdef    text
+*.asmref    text
+*.inputactions text
+
+# ------------------------------------------------------------------
+# Unity YAML assets: LF line endings + Unity's smart merge tool
+# (the merge driver must be set up in your git config; see the bottom)
+# ------------------------------------------------------------------
+*.unity          merge=unityyamlmerge eol=lf
+*.prefab         merge=unityyamlmerge eol=lf
+*.asset          merge=unityyamlmerge eol=lf
+*.mat            merge=unityyamlmerge eol=lf
+*.anim           merge=unityyamlmerge eol=lf
+*.controller     merge=unityyamlmerge eol=lf
+*.overrideController merge=unityyamlmerge eol=lf
+*.physicMaterial merge=unityyamlmerge eol=lf
+*.physicsMaterial2D merge=unityyamlmerge eol=lf
+*.playable       merge=unityyamlmerge eol=lf
+*.mask           merge=unityyamlmerge eol=lf
+*.brush          merge=unityyamlmerge eol=lf
+*.flare          merge=unityyamlmerge eol=lf
+*.fontsettings   merge=unityyamlmerge eol=lf
+*.guiskin        merge=unityyamlmerge eol=lf
+*.giparams       merge=unityyamlmerge eol=lf
+*.renderTexture  merge=unityyamlmerge eol=lf
+*.spriteatlas    merge=unityyamlmerge eol=lf
+*.spriteatlasv2  merge=unityyamlmerge eol=lf
+*.terrainlayer   merge=unityyamlmerge eol=lf
+*.mixer          merge=unityyamlmerge eol=lf
+*.shadervariants merge=unityyamlmerge eol=lf
+*.preset         merge=unityyamlmerge eol=lf
+*.lighting       merge=unityyamlmerge eol=lf
+*.scenetemplate  merge=unityyamlmerge eol=lf
+*.meta           merge=unityyamlmerge eol=lf
+
+# ------------------------------------------------------------------
+# Git LFS: large binary files
+# ------------------------------------------------------------------
+# Images
+*.png  filter=lfs diff=lfs merge=lfs -text
+*.jpg  filter=lfs diff=lfs merge=lfs -text
+*.jpeg filter=lfs diff=lfs merge=lfs -text
+*.gif  filter=lfs diff=lfs merge=lfs -text
+*.psd  filter=lfs diff=lfs merge=lfs -text
+*.psb  filter=lfs diff=lfs merge=lfs -text
+*.tga  filter=lfs diff=lfs merge=lfs -text
+*.tif  filter=lfs diff=lfs merge=lfs -text
+*.tiff filter=lfs diff=lfs merge=lfs -text
+*.bmp  filter=lfs diff=lfs merge=lfs -text
+*.exr  filter=lfs diff=lfs merge=lfs -text
+*.hdr  filter=lfs diff=lfs merge=lfs -text
+*.ase      filter=lfs diff=lfs merge=lfs -text
+*.aseprite filter=lfs diff=lfs merge=lfs -text
+*.kra  filter=lfs diff=lfs merge=lfs -text
+
+# Audio
+*.wav  filter=lfs diff=lfs merge=lfs -text
+*.mp3  filter=lfs diff=lfs merge=lfs -text
+*.ogg  filter=lfs diff=lfs merge=lfs -text
+*.aif  filter=lfs diff=lfs merge=lfs -text
+*.aiff filter=lfs diff=lfs merge=lfs -text
+*.flac filter=lfs diff=lfs merge=lfs -text
+
+# Video
+*.mp4  filter=lfs diff=lfs merge=lfs -text
+*.mov  filter=lfs diff=lfs merge=lfs -text
+*.webm filter=lfs diff=lfs merge=lfs -text
+
+# 3D models (in case any are used for effects or the store)
+*.fbx  filter=lfs diff=lfs merge=lfs -text
+*.obj  filter=lfs diff=lfs merge=lfs -text
+*.blend filter=lfs diff=lfs merge=lfs -text
+
+# Fonts
+*.ttf  filter=lfs diff=lfs merge=lfs -text
+*.otf  filter=lfs diff=lfs merge=lfs -text
+
+# Archives and native libraries
+*.zip  filter=lfs diff=lfs merge=lfs -text
+*.7z   filter=lfs diff=lfs merge=lfs -text
+*.dll  filter=lfs diff=lfs merge=lfs -text
+*.so   filter=lfs diff=lfs merge=lfs -text
+*.a    filter=lfs diff=lfs merge=lfs -text
+*.aar  filter=lfs diff=lfs merge=lfs -text
+*.jar  filter=lfs diff=lfs merge=lfs -text
+
+# ------------------------------------------------------------------
+# One-time setup for the Unity merge driver (run once per machine):
+#
+#   git config --global merge.unityyamlmerge.name "Unity SmartMerge"
+#   git config --global merge.unityyamlmerge.driver "'<Unity install>/Editor/Data/Tools/UnityYAMLMerge.exe' merge -p %O %B %A %A"
+#   git config --global merge.unityyamlmerge.recursive binary
+#
+# Without it, git falls back to its normal text merge for these files.
+# ------------------------------------------------------------------
