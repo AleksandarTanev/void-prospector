@@ -2,21 +2,44 @@ using System;
 using VoidProspector.Data;
 using VoidProspector.Economy;
 using VoidProspector.Mining;
+using VoidProspector.Progression;
 
 namespace VoidProspector.Core
 {
+    public enum CollectResult { Stored, AutoSold, CargoFull }
+
+    /// <summary>One hit's damage after a crit roll.</summary>
+    public readonly struct HitRoll
+    {
+        public readonly GameNumber damage;
+        public readonly bool crit;
+
+        public HitRoll(GameNumber damage, bool crit)
+        {
+            this.damage = damage;
+            this.crit = crit;
+        }
+    }
+
     /// <summary>
-    /// The state of one play session: data, current sector, wallet and cargo. Pure C#, so it can be tested.
-    /// Phase 3 uses every upgrade at level 0; Phase 4 adds levels.
+    /// The state of one play session: data, sector, depth, wallet, cargo and upgrades.
+    /// Pure C#, so it can be tested and driven by the economy simulator.
     /// </summary>
     public sealed class GameSession
     {
         public GameDatabase Database { get; }
-        public SectorDefinition Sector { get; private set; }
-        public int Depth { get; private set; }
+        public SectorDefinition Sector { get; }
         public Wallet Wallet { get; }
         public CargoHold Cargo { get; }
+        public Upgrades Upgrades { get; }
+        public DepthProgress Depths { get; }
         public Random Rng { get; }
+
+        /// <summary>Chunks below this purity grade are sold the moment they're collected. 0 = off.</summary>
+        public int AutoSellBelow { get; private set; }
+
+        /// <summary>Raised when something not covered by the wallet/cargo/upgrade/depth events changes (auto-sell setting).</summary>
+        public event Action SettingsChanged;
 
         public GameSession(GameDatabase database, SectorDefinition sector, int seed)
         {
@@ -24,34 +47,57 @@ namespace VoidProspector.Core
             Sector = sector ? sector : throw new ArgumentNullException(nameof(sector));
             Rng = new Random(seed);
             Wallet = new Wallet();
+            Upgrades = new Upgrades(database.upgrades, Wallet);
             Cargo = new CargoHold(CargoCapacity);
+            Depths = new DepthProgress(sector.maxDepth, database.mining != null ? database.mining.meteorsPerDepth : 15);
+
+            Upgrades.Bought += (track, _) =>
+            {
+                if (track.Effect == UpgradeEffect.CargoCapacity) Cargo.Capacity = CargoCapacity;
+            };
         }
 
         public MiningSettings Mining => Database.mining;
         public PurityTable Purity => Database.purity;
+        public int Depth => Depths.Current;
 
-        // ---------- Stats (from upgrade data) ----------
+        // ---------- Stats (from upgrade levels) ----------
 
-        public GameNumber DrillDamage => Effect(UpgradeEffect.DrillDamage, 1);
-        public float CollectorRadius => (float)Effect(UpgradeEffect.CollectorRadius, 4.5);
-        public int CargoCapacity => (int)Math.Floor(Effect(UpgradeEffect.CargoCapacity, 50));
-
-        double Effect(UpgradeEffect effect, double fallback)
-        {
-            var upgrade = Database.GetUpgrade(effect);
-            return upgrade != null ? upgrade.EffectAt(0) : fallback;
-        }
+        public GameNumber DrillDamage => Upgrades.Value(UpgradeEffect.DrillDamage, 1);
+        /// <summary>Seconds between auto-fire shots; 0 = auto-fire not bought yet.</summary>
+        public float AutoFireInterval => (float)Upgrades.Value(UpgradeEffect.AutoFireInterval, 0);
+        public float CritChance => (float)Math.Min(1, Upgrades.Value(UpgradeEffect.CritChance, 0));
+        public float CollectorRadius => (float)Upgrades.Value(UpgradeEffect.CollectorRadius, 4.5);
+        public int CargoCapacity => (int)Math.Floor(Upgrades.Value(UpgradeEffect.CargoCapacity, 50));
 
         // ---------- Rolls ----------
 
         public MeteorSpawn RollMeteor() => MeteorRoller.RollMeteor(Database, Sector, Depth, Rng);
 
-        public ChunkData RollChunk(MineralDefinition mineral, bool fromCore) =>
-            MeteorRoller.RollChunk(mineral, Purity, Sector, Depth, fromCore, Rng);
+        public ChunkData RollChunk(MineralDefinition mineral, int depth, bool fromCore) =>
+            MeteorRoller.RollChunk(mineral, Purity, Sector, depth, fromCore, Rng);
+
+        /// <summary>Damage for a tap (with the tap bonus) or an auto-fire shot, including a crit roll.</summary>
+        public HitRoll RollHit(bool fromTap)
+        {
+            var damage = DrillDamage;
+            if (fromTap && Mining != null) damage *= Mining.tapDamageMultiplier;
+            bool crit = CritChance > 0 && Rng.NextDouble() < CritChance;
+            if (crit) damage *= Mining != null ? Mining.critMultiplier : 2;
+            return new HitRoll(damage, crit);
+        }
 
         // ---------- Actions ----------
 
-        public bool TryCollect(ChunkData chunk) => Cargo.TryAdd(chunk);
+        public CollectResult TryCollect(ChunkData chunk)
+        {
+            if (chunk.grade < AutoSellBelow)
+            {
+                Wallet.Add(chunk.value);
+                return CollectResult.AutoSold;
+            }
+            return Cargo.TryAdd(chunk) ? CollectResult.Stored : CollectResult.CargoFull;
+        }
 
         /// <summary>Sells the whole cargo hold; returns the credits earned.</summary>
         public GameNumber SellCargo()
@@ -60,5 +106,16 @@ namespace VoidProspector.Core
             Wallet.Add(value);
             return value;
         }
+
+        public void SetAutoSellBelow(int grade)
+        {
+            grade = Math.Max(0, Math.Min(grade, Purity.Count));
+            if (grade == AutoSellBelow) return;
+            AutoSellBelow = grade;
+            SettingsChanged?.Invoke();
+        }
+
+        /// <summary>Counts a broken meteor toward unlocking the next depth.</summary>
+        public bool RegisterBreak(int meteorDepth) => Depths.RegisterBreak(meteorDepth);
     }
 }

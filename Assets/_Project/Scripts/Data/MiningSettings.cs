@@ -18,6 +18,15 @@ namespace VoidProspector.Data
         [Tooltip("Extra forgiveness around a meteor's edge for taps (world units)")]
         [Min(0)] public float tapPadding = 0.25f;
 
+        [Tooltip("Tap damage = drill damage × this (the GDD suggests a bonus for active play)")]
+        [Min(0)] public float tapDamageMultiplier = 1f;
+        [Tooltip("Damage multiplier of a critical hit")]
+        [Min(1)] public float critMultiplier = 2f;
+
+        [Header("Depth")]
+        [Tooltip("Meteors to break at the deepest unlocked depth to unlock the next one")]
+        [Min(1)] public int meteorsPerDepth = 15;
+
         [Header("Cracking")]
         [Tooltip("HP fractions at which the meteor cracks, highest first")]
         public float[] crackThresholds = { 0.66f, 0.33f };

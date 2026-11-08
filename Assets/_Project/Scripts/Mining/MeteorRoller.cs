@@ -9,6 +9,7 @@ namespace VoidProspector.Mining
     {
         public MeteorSizeDefinition size;
         public MeteorTypeDefinition type;
+        public int depth;
         public GameNumber hp;
         /// <summary>One mineral per chunk, in spill order.</summary>
         public MineralDefinition[] minerals;
@@ -29,6 +30,7 @@ namespace VoidProspector.Mining
             {
                 size = size,
                 type = type,
+                depth = depth,
                 hp = sector.MeteorHp(size, type, depth),
                 minerals = minerals,
             };
