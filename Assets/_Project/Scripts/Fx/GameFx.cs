@@ -41,6 +41,9 @@ namespace VoidProspector.Fx
             CreateParticles(particleMaterial);
         }
 
+        /// <summary>Normal game speed; the debug panel raises it.</summary>
+        public float BaseTimeScale { get; set; } = 1f;
+
         void OnDestroy() => Time.timeScale = 1f;
 
         void CreateParticles(Material material)
@@ -108,15 +111,15 @@ namespace VoidProspector.Fx
 
         // ---------- Text ----------
 
-        public void Number(Vector3 world, GameNumber value, bool big)
+        public void Number(Vector3 world, GameNumber value, bool big, bool crit = false)
         {
             var p = _pool.Count > 0 ? _pool.Pop() : NewPopup();
             p.world = world;
             p.age = 0;
             p.life = big ? 0.8f : 0.5f;
-            p.color = big ? Color.white : new Color(1f, 0.85f, 0.6f, 0.8f);
-            p.text.text = NumberFormatter.Format(value);
-            p.text.fontSize = big ? 46 : 30;
+            p.color = crit ? new Color(1f, 0.4f, 0.3f) : big ? Color.white : new Color(1f, 0.85f, 0.6f, 0.8f);
+            p.text.text = crit ? NumberFormatter.Format(value) + "!" : NumberFormatter.Format(value);
+            p.text.fontSize = crit ? 58 : big ? 46 : 30;
             p.text.gameObject.SetActive(true);
             _active.Add(p);
         }
@@ -148,7 +151,7 @@ namespace VoidProspector.Fx
 
         void Update()
         {
-            Time.timeScale = Time.unscaledTime < _hitStopUntil ? 0.05f : 1f;
+            Time.timeScale = Time.unscaledTime < _hitStopUntil ? 0.05f : BaseTimeScale;
 
             float dt = Time.unscaledDeltaTime;
             for (int i = _active.Count - 1; i >= 0; i--)

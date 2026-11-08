@@ -60,12 +60,14 @@ namespace VoidProspector.Core
             Chunks = gameObject.AddComponent<ChunkField>();
             Meteors = gameObject.AddComponent<MeteorField>();
             var input = gameObject.AddComponent<TapInput>();
+            var autoFire = gameObject.AddComponent<AutoFire>();
 
             Hud.Init(this);
             Fx.Init(Cam, particleMaterial, Hud.PopupLayer, Hud.Toast);
             Chunks.Init(this);
             Meteors.Init(this);
             input.Init(this);
+            autoFire.Init(this, shipRenderer.sharedMaterial);
         }
 
         bool ValidateData()

@@ -114,16 +114,16 @@ namespace VoidProspector.Mining
             if (_field.IsOutside(this)) _field.Release(this);
         }
 
-        public void Hit(GameNumber damage, bool fromTap)
+        public void Hit(HitRoll roll, bool fromTap)
         {
             if (!Active) return;
-            var result = State.Hit(damage);
+            var result = State.Hit(roll.damage);
 
             _flash = 0.08f;
             _punch = fromTap ? 0.12f : 0.05f;
             Vector3 pos = transform.position;
             var fx = Root.Fx;
-            fx.Number(pos + (Vector3)(Random.insideUnitCircle * Radius * 0.4f), damage, fromTap);
+            fx.Number(pos + (Vector3)(Random.insideUnitCircle * Radius * 0.4f), roll.damage, fromTap, roll.crit);
             fx.Burst(pos, Color.Lerp(_color, Color.white, 0.4f), fromTap ? 6 : 2, 3f, 0.12f);
             if (fromTap) fx.Shake(S.hitShake);
             Root.Audio.Hit(fromTap);
@@ -166,6 +166,8 @@ namespace VoidProspector.Mining
         {
             int core = _spawn.size.hasCore ? S.coreChunks : 0;
             Spill(result.breakChunks, core);
+            if (Root.Session.RegisterBreak(_spawn.depth))
+                Root.Fx.Toast($"Depth {Root.Session.Depths.Deepest + 1} unlocked!", new Color(0.6f, 0.9f, 1f));
 
             int sizeBoost = Mathf.RoundToInt(Radius * 10);
             Root.Fx.Burst(transform.position, Color.Lerp(_baseColor, Color.white, 0.2f), 14 + sizeBoost, 5f, 0.25f);
@@ -183,7 +185,7 @@ namespace VoidProspector.Mining
             {
                 var mineral = _spawn.minerals[_nextChunk++];
                 bool fromCore = i >= count - coreCount;
-                var chunk = session.RollChunk(mineral, fromCore);
+                var chunk = session.RollChunk(mineral, _spawn.depth, fromCore);
                 Vector2 dir = Random.insideUnitCircle.normalized;
                 float speed = Random.Range(S.chunkBurstSpeed.x, S.chunkBurstSpeed.y);
                 Root.Chunks.Spawn(centre + dir * Radius * 0.6f, chunk, dir * speed);

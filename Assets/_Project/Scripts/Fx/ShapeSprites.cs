@@ -14,6 +14,16 @@ namespace VoidProspector.Fx
         public static Sprite Glow => _glow != null ? _glow : (_glow = Make(GlowAlpha, "Glow"));
         public static Sprite Square => _square != null ? _square : (_square = Make((x, y) => 1f, "Square"));
 
+        static Sprite _ring;
+        /// <summary>Thin ring at the edge of the 1-unit circle.</summary>
+        public static Sprite Ring => _ring != null ? _ring : (_ring = Make(RingAlpha, "Ring"));
+
+        static float RingAlpha(float x, float y)
+        {
+            float d = Mathf.Sqrt(x * x + y * y);
+            return Mathf.Clamp01(1f - Mathf.Abs(d - 0.97f) * Size * 0.25f);
+        }
+
         static float CircleAlpha(float x, float y)
         {
             float d = Mathf.Sqrt(x * x + y * y);

@@ -76,17 +76,17 @@ namespace VoidProspector.Mining
         void TryCollect(int index)
         {
             var c = _active[index];
-            if (Session.TryCollect(c.Data))
-            {
-                _root.Audio.Pickup(c.Data.grade);
-                _root.Fx.Burst(_root.Ship.position, c.Tint, 3, 1.5f, 0.1f);
-                Release(index);
-            }
-            else
+            var result = Session.TryCollect(c.Data);
+            if (result == CollectResult.CargoFull)
             {
                 c.Reject();
                 if (_root.Fx.CargoFull()) _root.Audio.Deny();
+                return;
             }
+            _root.Audio.Pickup(c.Data.grade);
+            var color = result == CollectResult.AutoSold ? new Color(1f, 0.85f, 0.3f) : c.Tint;
+            _root.Fx.Burst(_root.Ship.position, color, 3, 1.5f, 0.1f);
+            Release(index);
         }
 
         void Release(int index)

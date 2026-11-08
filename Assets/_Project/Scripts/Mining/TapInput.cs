@@ -40,7 +40,7 @@ namespace VoidProspector.Mining
             var cam = _root.Cam;
             Vector2 world = cam.ScreenToWorldPoint(new Vector3(screen.x, screen.y, -cam.transform.position.z));
             var meteor = _root.Meteors.AtPoint(world, _root.Session.Mining.tapPadding);
-            if (meteor != null) meteor.Hit(_root.Session.DrillDamage, true);
+            if (meteor != null) meteor.Hit(_root.Session.RollHit(true), true);
             else _root.Fx.Burst(world, new Color(0.6f, 0.8f, 1f, 0.6f), 3, 1.2f, 0.08f);
         }
 
