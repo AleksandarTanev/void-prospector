@@ -1,0 +1,34 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 9138dea30543be742b05bb15f0d1489a, type: 3}
+  m_Name: MiningSettings
+  m_EditorClassIdentifier: VoidProspector::VoidProspector.Data.MiningSettings
+  minMeteors: 6
+  maxMeteors: 12
+  driftSpeed: {x: 0.25, y: 0.8}
+  respawnDelay: {x: 0.3, y: 1}
+  tapPadding: 0.25
+  crackThresholds:
+  - 0.66
+  - 0.33
+  crackSpillFraction: 0.25
+  coreChunks: 3
+  chunkBurstSpeed: {x: 2.5, y: 5}
+  chunkSettleTime: 0.35
+  magnetSpeed: 9
+  driftToShip: 1.5
+  rejectedFadeTime: 1.2
+  rareGrade: 3
+  hitShake: 0.05
+  crackShake: 0.25
+  breakShake: 0.5
+  topGradeHitStop: 0.25

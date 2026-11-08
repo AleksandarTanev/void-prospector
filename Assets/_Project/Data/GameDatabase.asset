@@ -34,3 +34,4 @@ MonoBehaviour:
   - {fileID: 11400000, guid: d16226d63063d4140bfa847bce6a67a3, type: 2}
   - {fileID: 11400000, guid: 86b29af507029f542b307c5fbd53a840, type: 2}
   - {fileID: 11400000, guid: a9a0de46289ae224a844d82084015f63, type: 2}
+  mining: {fileID: 11400000, guid: 11425b02f72f3cb44863694711625c50, type: 2}

@@ -15,6 +15,7 @@ namespace VoidProspector.Data
         public MeteorTypeDefinition[] meteorTypes = Array.Empty<MeteorTypeDefinition>();
         public SectorDefinition[] sectors = Array.Empty<SectorDefinition>();
         public UpgradeDefinition[] upgrades = Array.Empty<UpgradeDefinition>();
+        public MiningSettings mining;
 
         public MineralDefinition GetMineral(string id) => Find(minerals, id);
         public MeteorSizeDefinition GetMeteorSize(string id) => Find(meteorSizes, id);
@@ -63,6 +64,7 @@ namespace VoidProspector.Data
             CheckList(upgrades, "Upgrades", errors);
 
             ValidatePurity(errors);
+            ValidateMining(errors);
 
             foreach (var s in meteorSizes)
             {
@@ -122,6 +124,20 @@ namespace VoidProspector.Data
                 }
             }
             if (!HasPositiveWeight(g, x => x.dropWeight)) errors.Add("Purity: no grade has a positive drop weight");
+        }
+
+        void ValidateMining(List<string> errors)
+        {
+            if (mining == null) { errors.Add("Mining settings are missing"); return; }
+            if (mining.maxMeteors < mining.minMeteors) errors.Add("Mining: maxMeteors < minMeteors");
+            var t = mining.crackThresholds;
+            for (int i = 0; i < t.Length; i++)
+            {
+                if (t[i] <= 0 || t[i] >= 1) errors.Add($"Mining: crack threshold {t[i]} must be between 0 and 1");
+                if (i > 0 && t[i] >= t[i - 1]) errors.Add("Mining: crack thresholds must go from highest to lowest");
+            }
+            if (mining.crackSpillFraction * t.Length > 1) errors.Add("Mining: cracks would spill more than all chunks");
+            if (purity != null && mining.rareGrade >= purity.Count) errors.Add("Mining: rareGrade is above the top purity grade");
         }
 
         static void CheckList<T>(T[] items, string label, List<string> errors) where T : ScriptableObject
