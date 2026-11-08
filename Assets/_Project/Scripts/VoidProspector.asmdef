@@ -1,7 +1,10 @@
 {
     "name": "VoidProspector",
     "rootNamespace": "VoidProspector",
-    "references": [],
+    "references": [
+        "Unity.InputSystem",
+        "UnityEngine.UI"
+    ],
     "includePlatforms": [],
     "excludePlatforms": [],
     "allowUnsafeCode": false,
