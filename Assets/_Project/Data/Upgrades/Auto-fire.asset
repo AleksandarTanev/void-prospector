@@ -20,7 +20,7 @@ MonoBehaviour:
   baseValue: 1.2
   perLevel: 0.88
   offAtLevelZero: 1
-  baseCost: 50
-  growth: 1.15
+  baseCost: 200
+  growth: 1.2
   maxLevel: 30
   costMineral: {fileID: 0}
