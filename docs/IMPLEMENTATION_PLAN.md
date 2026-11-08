@@ -113,17 +113,28 @@ Detailed plan, starting numbers and removal steps: [PROTOTYPE_PLAN.md](PROTOTYPE
 
 Put all balance numbers in **ScriptableObjects**, not in code. Then you can tune the game without recompiling, and the values can be checked against the economy spreadsheet.
 
-- [ ] `MineralDefinition`: id, name, tier, base value, colour, icon
-- [ ] `PurityGrade` table: grade name, purity range, value multiplier, base drop chance, visual settings
-- [ ] `MeteorSizeDefinition`: HP multiplier, chunk count range, spawn weight
-- [ ] `MeteorTypeDefinition`: HP multiplier, mineral composition table (mineral + weight)
-- [ ] `SectorDefinition`: base HP, meteor type weights, max depth, unlock cost
-- [ ] `UpgradeDefinition`: id, base cost, growth rate, cost currency or mineral, effect type, effect per level
-- [ ] Create assets for Sector 1 only: Rock, Copper, Tin; Stony meteors; all five sizes
-- [ ] Decide the number type: `double` is enough at first. Wrap it in a `GameNumber` struct so it can be swapped for BreakInfinity later.
-- [ ] Number formatting: 1,234 → 1.23K → 4.56M → 7.89B, and so on
+- [x] `MineralDefinition`: id, name, tier, base value, colour, icon
+- [x] `PurityTable` (grades): grade name, purity range, value multiplier, drop weight, glow, tint
+- [x] `MeteorSizeDefinition`: HP multiplier, chunk count range, radius, spawn weight, core bonus
+- [x] `MeteorTypeDefinition`: HP multiplier, mineral composition table (mineral + weight)
+- [x] `SectorDefinition`: base HP, meteor type weights, max depth, signature mineral, unlock cost, depth scaling
+- [x] `UpgradeDefinition`: id, base cost, growth rate, max level, cost mineral (empty = credits), effect type, Add/Multiply mode, effect per level
+- [x] `GameDatabase`: references all data; lookup by id; `Validate()` checks ids, references, weights and purity ranges
+- [x] Create assets for Sector 1: Rock, Copper, Tin (+ Iron, ready for Sector 2); Stony meteors; all five sizes; Debris Ring; the five Phase 4 upgrades
+- [x] Number type: `GameNumber` struct wrapping `double`, ready to swap for BreakInfinity later
+- [x] Number formatting: 7.5 → 999 → 1.23K → 4.56M → 7.89B … Dc, then scientific; truncated, never rounded up
+- [x] GDD formulas in `Formulas`: upgrade cost, chunk value, meteor HP, Stardust, upgrade effect
+- [x] EditMode tests (56 cases): formulas, formatter, `GameNumber`, weighted random, and validation of the real data assets
 
-**Done when:** the Sector 1 data exists as assets and a unit test checks `cost(L) = base × g^L`.
+**Layout**
+```
+Assets/_Project/Scripts/   VoidProspector.asmdef — Core/ (GameNumber, NumberFormatter, WeightedRandom, Formulas), Data/ (ScriptableObjects)
+Assets/_Project/Data/      GameDatabase.asset, Minerals/, Purity/, Meteors/Sizes/, Meteors/Types/, Sectors/, Upgrades/
+Assets/Tests/EditMode/     VoidProspector.Tests.EditMode.asmdef
+```
+To add data: create the asset (right-click → Create → Void Prospector → …), give it a unique `id`, and add it to `GameDatabase`. `DataValidationTests` fails if something is inconsistent.
+
+**Done when:** the Sector 1 data exists as assets and a unit test checks `cost(L) = base × g^L`. ✅
 
 ---
 
