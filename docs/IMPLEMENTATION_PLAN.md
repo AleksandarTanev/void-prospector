@@ -17,6 +17,7 @@ How to build the game described in the Game Design Document (GDD), step by step.
 | Input | New Input System only |
 | Packages | Input System 1.20, uGUI 2.6 (includes TextMeshPro), Test Framework 1.8, URP 17.6 |
 | Prototype | Built in `Assets/Prototype/` (Phase 1, steps 1–9); see [PROTOTYPE_PLAN.md](PROTOTYPE_PLAN.md) |
+| Real game | Phase 2 (data) done; Phase 3 (core loop greybox) built in `Assets/_Project/`, scene `Assets/_Project/Scenes/Game.unity` |
 
 Work through the phases in order. Each phase ends with a **Done when** check. Don't start the next phase until it passes. The early phases are deliberately ugly: they prove that the game is fun before any art is made. Phase 1 is a quick, throwaway gameplay prototype; the real game is built from Phase 2 onward.
 
@@ -142,15 +143,30 @@ To add data: create the asset (right-click → Create → Void Prospector → �
 
 Use coloured circles and squares only. Rebuild the core loop properly on top of the Phase 2 data, keeping what the prototype proved and dropping what it didn't.
 
-- [ ] **Meteor field:** a spawner keeps 6–12 meteors drifting slowly; respawn at the edges; object pooling from day one
-- [ ] **Meteor:** HP = sector base × size × type; rolls its composition when it spawns
-- [ ] **Tap to damage:** Input System touch → raycast → damage; a damage number pops up
-- [ ] **Cracking stages:** at 66% and 33% HP, spill some chunks and swap in a cracked sprite or tint
-- [ ] **Chunks:** spawned with a physics burst; each rolls a mineral and a purity grade
-- [ ] **Collector:** chunks fly to the ship within a pickup radius
-- [ ] **Cargo hold:** capacity limit, shown as a fill bar
-- [ ] **Sell button:** chunk values (base × purity multiplier) go into the credits wallet
-- [ ] **Basic juice:** small screen shake on hit, particle burst on crack, tint/glow by purity grade
+- [x] **Meteor field:** a spawner keeps 6–12 meteors drifting slowly; respawn at the edges; object pooling from day one (`UnityEngine.Pool.ObjectPool`)
+- [x] **Meteor:** HP = sector base × size × type; rolls its composition when it spawns; coloured veins hint at Copper/Tin inside
+- [x] **Tap to damage:** Input System touch/mouse → hit test against meteor circles (with padding for fat fingers) → damage; a damage number pops up
+- [x] **Cracking stages:** at 66% and 33% HP, spill a quarter of the chunks each, add crack lines and darken the tint
+- [x] **Chunks:** spawned with a burst; each mineral is rolled at spawn, the purity grade when it spills; Large/Colossal cores give the last 3 chunks +1 grade
+- [x] **Collector:** chunks inside the pickup radius fly to the ship; the rest drift slowly toward it, so nothing is lost unless the hold is full
+- [x] **Cargo hold:** capacity limit (from the Cargo upgrade at level 0), shown as a fill bar; chunks bounce off and fade when it's full
+- [x] **Sell button:** chunk values (base × purity multiplier) go into the credits wallet
+- [x] **Basic juice:** small screen shake on hit, particle burst on crack, tint/glow by purity grade, toast + sting for Pristine+, hit-stop on Flawless, generated sounds
+- [x] EditMode tests (73 in total): wallet, cargo hold, crack/spill logic, meteor and chunk rolls on the real data, selling
+- [ ] Play it yourself for 5 minutes (scene `Assets/_Project/Scenes/Game.unity`, portrait Game view 1080×1920)
+
+**Layout**
+```
+Assets/_Project/Scenes/Game.unity   Main Camera, Global Light 2D, GameRoot (the only object you edit)
+Assets/_Project/Data/MiningSettings.asset   field size, drift speed, crack thresholds, chunk speeds, juice — referenced by GameDatabase
+Assets/_Project/Scripts/
+  Core/      GameRoot (builds the world), GameSession (pure C# state: data, sector, wallet, cargo, rolls)
+  Economy/   Wallet, CargoHold (pure C#)
+  Mining/    MeteorState + MeteorRoller (pure C#), MeteorField, Meteor, ChunkField, Chunk, TapInput
+  Fx/        GameFx (particles, shake, hit-stop, popups, toasts), GameAudio, ShapeSprites
+  UI/        Hud, UiFactory (greybox uGUI built in code)
+```
+Game logic lives in plain C# classes so it can be unit-tested; MonoBehaviours only display it. Stats (damage, collector radius, cargo capacity) come from the upgrade assets at level 0, so Phase 4 only has to add levels. `Game.unity` is now first in the build list; the prototype scene stays second.
 
 **Done when:** you can tap meteors for 5 minutes and it's already a bit satisfying with no upgrades.
 
