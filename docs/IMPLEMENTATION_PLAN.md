@@ -17,7 +17,7 @@ How to build the game described in the Game Design Document (GDD), step by step.
 | Input | New Input System only |
 | Packages | Input System 1.20, uGUI 2.6 (includes TextMeshPro), Test Framework 1.8, URP 17.6 |
 | Prototype | Built in `Assets/Prototype/` (Phase 1, steps 1–9); see [PROTOTYPE_PLAN.md](PROTOTYPE_PLAN.md) |
-| Real game | Phase 2 (data) done; Phase 3 (core loop greybox) built in `Assets/_Project/`, scene `Assets/_Project/Scenes/Game.unity` |
+| Real game | Phases 2–3 done; Phase 4 (upgrades and economy) built in `Assets/_Project/`, scene `Assets/_Project/Scenes/Game.unity` |
 
 Work through the phases in order. Each phase ends with a **Done when** check. Don't start the next phase until it passes. The early phases are deliberately ugly: they prove that the game is fun before any art is made. Phase 1 is a quick, throwaway gameplay prototype; the real game is built from Phase 2 onward.
 
@@ -153,7 +153,7 @@ Use coloured circles and squares only. Rebuild the core loop properly on top of 
 - [x] **Sell button:** chunk values (base × purity multiplier) go into the credits wallet
 - [x] **Basic juice:** small screen shake on hit, particle burst on crack, tint/glow by purity grade, toast + sting for Pristine+, hit-stop on Flawless, generated sounds
 - [x] EditMode tests (73 in total): wallet, cargo hold, crack/spill logic, meteor and chunk rolls on the real data, selling
-- [ ] Play it yourself for 5 minutes (scene `Assets/_Project/Scenes/Game.unity`, portrait Game view 1080×1920)
+- [x] Play it yourself for 5 minutes (scene `Assets/_Project/Scenes/Game.unity`, portrait Game view 1080×1920)
 
 **Layout**
 ```
@@ -168,20 +168,41 @@ Assets/_Project/Scripts/
 ```
 Game logic lives in plain C# classes so it can be unit-tested; MonoBehaviours only display it. Stats (damage, collector radius, cargo capacity) come from the upgrade assets at level 0, so Phase 4 only has to add levels. `Game.unity` is now first in the build list; the prototype scene stays second.
 
-**Done when:** you can tap meteors for 5 minutes and it's already a bit satisfying with no upgrades.
+**Done when:** you can tap meteors for 5 minutes and it's already a bit satisfying with no upgrades. ✅
 
 ---
 
 ## Phase 4 — Upgrades and economy
 
-- [ ] `UpgradeTrack` runtime: level, next cost, apply effect
-- [ ] Upgrade tracks: Drill damage, Fire rate, Crit chance, Collector radius, Cargo capacity
-- [ ] **Auto-fire:** the Pulse Laser tool tier fires at the nearest meteor on a timer
-- [ ] Upgrades panel UI: scrolling list; cost shown and greyed out when unaffordable; buy ×1 / ×10 / max
-- [ ] Auto-sell threshold setting ("sell anything below Standard")
-- [ ] **Depth levels** within a sector: HP ×1.18 and value ×1.15 per depth (the GDD's formulas)
-- [ ] Build the **economy spreadsheet** (Google Sheets or Excel) with the same formulas, and simulate the first 30 minutes
-- [ ] Debug panel (development builds only): add credits, speed up time ×10, reset save
+- [x] `UpgradeTrack` runtime: level, next cost, effect, quotes for ×1 / ×10 / MAX; `Upgrades` spends credits from the wallet
+- [x] Upgrade tracks: Drill damage, Fire rate (Auto-fire), Crit chance (×2 damage), Collector radius, Cargo capacity
+- [x] **Auto-fire:** the Pulse Laser fires at the nearest meteor on a timer once the Auto-fire upgrade is bought; the collector radius is drawn as a faint ring
+- [x] Upgrades panel UI: scrolling list; current → next effect; cost shown and greyed out when unaffordable; buy ×1 / ×10 / MAX toggle
+- [x] Auto-sell threshold setting: off / below Standard / below Refined / below Pristine; matching chunks are sold the moment they're collected
+- [x] **Depth levels** within a sector: HP ×1.18 and value +15% per depth; break 40 meteors at the deepest depth to unlock the next; `<` / `>` in the top bar to move between unlocked depths (chunks keep the value of the depth their meteor came from)
+- [x] **Economy spreadsheet** `docs/economy/Economy.xlsx`: inputs, cost/effect per level, HP and value per depth, and three simulated first 30 minutes
+- [x] Debug panel (editor and development builds; DEV button): +$1K, +$1M, speed ×10, unlock depths, restart (save reset comes with Phase 5)
+- [x] EditMode tests (89 in total), including a pacing test that runs the simulator on the real data
+- [ ] Play it yourself for 5–10 minutes and check the pacing feels right
+
+**Economy tuning** (done with `EconomySimulator`, which plays the real `GameSession` without visuals: 3 taps/s, sells when full, always buys the cheapest upgrade, mines at the deepest depth)
+
+| Upgrade | Base cost | Growth | Was |
+| --- | --- | --- | --- |
+| Drill damage | 25 | 1.20 | 10 × 1.15 |
+| Auto-fire | 200 | 1.20 | 50 × 1.15 |
+| Crit chance | 400 | 1.25 | 100 × 1.20 |
+| Collector radius | 100 | 1.20 | 25 × 1.15 |
+| Cargo capacity | 160 | 1.23 | 40 × 1.18 |
+
+Median time between purchases (3 seeds): **6–7 s** in minutes 0–5 (target 5–15 s), 17–19 s in minutes 5–15, 37–39 s in minutes 15–30. With the old prices it was 2.6 s. The simulated player reaches depth 10 after about 7 minutes and buys Auto-fire at about 1.5 minutes.
+
+To redo the spreadsheet after changing data: Unity menu **Void Prospector → Export Economy Data** (writes `docs/economy/data/`), then `python tools/economy/build_economy_xlsx.py docs/economy/data docs/economy/Economy.xlsx` (needs `openpyxl`), and open it in Excel.
+
+**Open questions for playtesting**
+- The GDD suggests taps deal bonus damage (e.g. 3×) over auto-fire. `MiningSettings.tapDamageMultiplier` is 1 for now so the Phase 3 feel doesn't change; try 2–3 once drones arrive.
+- The GDD says depth also raises purity odds slightly; not done yet (needs a rule for shifting drop weights).
+- Collector radius matters less now that chunks always drift to the ship. Consider turning it into a magnet-speed upgrade.
 
 **Done when:** in the first 5 minutes the player can buy something every 5–15 seconds, matching the GDD's pacing table.
 
