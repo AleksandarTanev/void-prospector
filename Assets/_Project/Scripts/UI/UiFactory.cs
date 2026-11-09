@@ -103,6 +103,67 @@ namespace VoidProspector.UI
             return b;
         }
 
+        /// <summary>
+        /// A full-screen dialog on its own canvas: a dim layer that swallows taps meant for the game, and a panel
+        /// inset by <paramref name="margin"/> pixels. Returns the panel; <paramref name="canvas"/> is what to show and hide.
+        /// </summary>
+        public static RectTransform Modal(string name, int sortingOrder, Color panelColor, Vector2 margin, out RectTransform canvas)
+        {
+            canvas = Canvas(name);
+            canvas.GetComponent<Canvas>().sortingOrder = sortingOrder;
+            var dim = Panel("Dim", canvas, new Color(0f, 0f, 0f, 0.75f));
+            Stretch(dim.rectTransform);
+            var panel = Panel("Panel", canvas, panelColor).rectTransform;
+            panel.anchorMin = Vector2.zero;
+            panel.anchorMax = Vector2.one;
+            panel.offsetMin = margin;
+            panel.offsetMax = -margin;
+            return panel;
+        }
+
+        /// <summary>A vertical scrolling list filling <paramref name="parent"/> minus the given insets; returns the content rect rows go into.</summary>
+        public static RectTransform ScrollList(RectTransform parent, Vector2 offsetMin, Vector2 offsetMax, float spacing)
+        {
+            var view = Rect("Scroll View", parent);
+            view.anchorMin = Vector2.zero;
+            view.anchorMax = Vector2.one;
+            view.offsetMin = offsetMin;
+            view.offsetMax = offsetMax;
+            view.gameObject.AddComponent<Image>().color = new Color(0, 0, 0, 0.01f);   // receives drags
+            view.gameObject.AddComponent<RectMask2D>();
+
+            var content = Rect("Content", view);
+            content.anchorMin = new Vector2(0, 1);
+            content.anchorMax = new Vector2(1, 1);
+            content.pivot = new Vector2(0.5f, 1);
+            content.offsetMin = content.offsetMax = Vector2.zero;
+            var layout = content.gameObject.AddComponent<VerticalLayoutGroup>();
+            layout.spacing = spacing;
+            layout.childControlHeight = true;
+            layout.childControlWidth = true;
+            layout.childForceExpandHeight = false;
+            layout.childForceExpandWidth = true;
+            content.gameObject.AddComponent<ContentSizeFitter>().verticalFit = ContentSizeFitter.FitMode.PreferredSize;
+
+            var scroll = view.gameObject.AddComponent<ScrollRect>();
+            scroll.content = content;
+            scroll.viewport = view;
+            scroll.horizontal = false;
+            scroll.movementType = ScrollRect.MovementType.Clamped;
+            scroll.scrollSensitivity = 30;
+            return content;
+        }
+
+        /// <summary>A panel row of fixed height inside a layout list.</summary>
+        public static RectTransform ListRow(RectTransform content, string name, float height, Color color)
+        {
+            var bg = Panel(name, content, color);
+            bg.gameObject.AddComponent<LayoutElement>().preferredHeight = height;
+            return bg.rectTransform;
+        }
+
+        public static string Hex(Color c) => ColorUtility.ToHtmlStringRGB(c);
+
         public static void Stretch(RectTransform rt)
         {
             rt.anchorMin = Vector2.zero;

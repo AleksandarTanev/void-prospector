@@ -17,7 +17,7 @@ How to build the game described in the Game Design Document (GDD), step by step.
 | Input | New Input System only |
 | Packages | Input System 1.20, uGUI 2.6 (includes TextMeshPro), Test Framework 1.8, URP 17.6 |
 | Prototype | Built in `Assets/Prototype/` (Phase 1, steps 1–9); see [PROTOTYPE_PLAN.md](PROTOTYPE_PLAN.md) |
-| Real game | Phases 2–5 done; Phase 6 (Sector 2, drones, milestones) built in `Assets/_Project/`, scene `Assets/_Project/Scenes/Game.unity` |
+| Real game | Phases 2–5 done; Phases 6 (Sector 2, drones, milestones) and 7 (Sector 3, refinery, scanner, codex) built in `Assets/_Project/`, scene `Assets/_Project/Scenes/Game.unity` |
 
 Work through the phases in order. Each phase ends with a **Done when** check. Don't start the next phase until it passes. The early phases are deliberately ugly: they prove that the game is fun before any art is made. Phase 1 is a quick, throwaway gameplay prototype; the real game is built from Phase 2 onward.
 
@@ -272,13 +272,38 @@ Open questions:
 
 ## Phase 7 — Sector 3, refinery and scanner (the purity hook)
 
-- [ ] Data: Silver, Quartz; Crystalline meteors; Sector 3
-- [ ] **Refinery:** queue a batch of one mineral; each cycle has a chance to raise the grade; success odds and duration per grade
-- [ ] Refinery upgrades: speed, success chance, batch size, Stabiliser (prevents mass loss)
-- [ ] Refinery UI: queue, progress bar, collect or sell
-- [ ] **Scanner:** shows the composition (and later the purity) of meteors in range; alert for rare meteors
-- [ ] Large-meteor **core bonus**: the last chunks roll +1 purity grade
-- [ ] **Mineral Codex:** each mineral × grade is an entry; filling one gives a permanent small value bonus
+- [x] Data: Silver, Quartz; Crystalline meteors; Sector 3
+- [x] **Refinery:** queue a batch of one mineral; each cycle has a chance to raise the grade; success odds and duration per grade
+- [x] Refinery upgrades: speed, success chance, batch size, Stabiliser (prevents mass loss)
+- [x] Refinery UI: queue, progress bar, collect or sell
+- [x] **Scanner:** shows the composition (and later the purity) of meteors in range; alert for rare meteors
+- [x] Large-meteor **core bonus**: the last chunks roll +1 purity grade (already in since Phase 3: `MiningSettings.coreChunks`, Large and Colossal sizes)
+- [x] **Mineral Codex:** each mineral × grade is an entry; filling one gives a permanent small value bonus
+- [x] EditMode tests (170 in total), including "refining is worth it at low grades and a gamble at the top" and "reaching Sector 3 takes 18–50 minutes"
+- [ ] Play it: reach the Crystal Drift, refine a few batches, and check that "sell now or refine?" is a real question
+
+How it works:
+- **Sector 3, Crystal Drift**: base HP 260, Stony 15 / Metallic 45 / Crystalline 40. Jump drive **$50,000 + 40 Iron** (the Iron Belt's signature mineral), after depth 10 of the Iron Belt. **Crystalline** meteors: HP ×0.6, Rock 20 / Quartz 40 / Silver 30 / Nickel 10, blue-violet. **Silver** 120, **Quartz** 140 (tier 3). New milestones: Mine 300 Quartz, Mine 300 Silver, Reach depth 10 in the Crystal Drift.
+- **Refinery** (`Refining/Refinery`, pure; settings in `GameDatabase.refinery`): one batch of up to N chunks of one mineral and grade, loaded from a cargo stack. Each attempt takes the stage's time; it succeeds with the stage's chance (value × the grade ratio) or fails and loses a share of the chunks. It keeps trying until the **target grade** ("Stop at", default the top). Collect puts the batch back in the hold (only if all of it fits); Sell sells it directly. It runs during offline time too (capped like earnings) and the Welcome back popup reports it.
+
+  | Step | Time | Chance | Loss on failure | Average per try |
+  | --- | --- | --- | --- | --- |
+  | Crude → Standard | 15 s | 85% | 10% | ×1.84 |
+  | Standard → Refined | 30 s | 65% | 15% | ×1.92 |
+  | Refined → Pristine | 60 s | 40% | 25% | ×1.65 |
+  | Pristine → Flawless | 120 s | 15% | 50% | **×0.93** (a gamble) |
+
+  Upgrades (from Sector 3): Refinery Speed (×1.15 per level), Refine Success (+3% per level, max 95%), Refinery Batch (10, +5 per level), Stabiliser (−20% loss per level; no loss at level 5). The dialog shows the odds and "×N on average" for the batch and for every stack in the hold, so the choice is visible. The decision: refining is time in a single slot, so cheap stacks are better sold; valuable stacks at low grades are worth refining; the last step loses on average until the Stabiliser or success upgrades are bought.
+- **Mineral Codex** (`Progression/Codex`, CODEX button on the right): an entry per mineral × grade, filled when a chunk of that grade is collected or refined. Bonus to that mineral's value: +1% / 2% / 3% / 4% / 5% from Crude to Flawless (+15% for a full row). Multiplies with milestone bonuses (`Session.ValueMultiplier`). New entries from Standard up get a toast.
+- **Scanner** (upgrade from Sector 3, range 3 m +0.7 per level): meteors within range show their remaining contents under them; rare meteors (4+ chunks of tier 3 or higher, `GameDatabase.scanner`) are marked RARE anywhere on screen and announced with a toast (at most every 8 s).
+- **Save version 3**: refinery batch (mineral, grade, count, value, progress, target) and codex entries.
+- HUD: CODEX and REFINE buttons on the right under the top bar. REFINE appears with Sector 3, shows the attempt's progress and turns gold when the batch is done.
+
+Open questions:
+- Refinery is a single slot (GDD open question). Parallel slots could be a later upgrade.
+- The simulated player never refines, so pacing tests don't include it. If refining turns out to be a big income source, add a refining strategy to the simulator.
+- "Later the purity" for the scanner: not done; a natural higher scanner level once purity is rolled at spawn instead of when chunks spill.
+- Tuning not checked yet: Sector 3 is expected at 18–50 minutes (GDD ~30). Refinery and scanner prices are guesses relative to Sector 3 income.
 
 **Done when:** the player faces a real choice between "sell now" and "refine first", and both are sometimes right.
 

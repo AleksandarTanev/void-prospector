@@ -197,6 +197,11 @@ namespace VoidProspector.UI
                 case UpgradeEffect.DroneCount: return ((int)v).ToString(c) + ((int)v == 1 ? " drone" : " drones");
                 case UpgradeEffect.DroneDamage: return (v * 100).ToString("0", c) + "% of drill";
                 case UpgradeEffect.DroneTargeting: return DroneTargeting.Describe(DroneTargeting.RuleForLevel(v));
+                case UpgradeEffect.RefinerySpeed: return "×" + v.ToString("0.00", c) + " speed";
+                case UpgradeEffect.RefineSuccess: return "+" + (v * 100).ToString("0", c) + "% chance";
+                case UpgradeEffect.RefineryBatch: return ((int)v).ToString(c) + " per batch";
+                case UpgradeEffect.RefineryStabiliser: return (v * 100).ToString("0", c) + "% less loss";
+                case UpgradeEffect.ScannerRange: return v <= 0 ? "off" : v.ToString("0.0", c) + "m";
                 default: return v.ToString("0.##", c);
             }
         }

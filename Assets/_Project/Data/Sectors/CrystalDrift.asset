@@ -1,0 +1,35 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: aee95da3d341e3b4a84f2ffaa39b9a0a, type: 3}
+  m_Name: CrystalDrift
+  m_EditorClassIdentifier: VoidProspector::VoidProspector.Data.SectorDefinition
+  id: crystal_drift
+  displayName: Crystal Drift
+  index: 3
+  baseHp: 260
+  maxDepth: 10
+  meteorTypes:
+  - type: {fileID: 11400000, guid: ca813b2a5584ea24990fdc46a0767f54, type: 2}
+    weight: 15
+  - type: {fileID: 11400000, guid: 0bfaf26140a34de385f4c3c847440492, type: 2}
+    weight: 45
+  - type: {fileID: 11400000, guid: 79c12cc8aa8447209c8b15a8ae5b5c3c, type: 2}
+    weight: 40
+  signatureMineral: {fileID: 11400000, guid: 80513660e983444d9cc0b1a928741413, type: 2}
+  unlockCost:
+  - mineral: {fileID: 0}
+    amount: 50000
+  - mineral: {fileID: 11400000, guid: 33941faba2cd45244b23e3c23b4b9295, type: 2}
+    amount: 40
+  backgroundColor: {r: 0.05, g: 0.03, b: 0.11, a: 1}
+  depthHpGrowth: 1.18
+  depthValueStep: 0.15

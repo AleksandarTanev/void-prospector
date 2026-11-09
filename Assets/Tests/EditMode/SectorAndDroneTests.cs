@@ -133,7 +133,7 @@ namespace VoidProspector.Tests
             Assert.AreEqual(1, s.Cargo.CountOf(_copper), "pays with the cheapest chunks");
             Assert.AreEqual(1, s.Cargo.CountOf(_copper, 3));
             Assert.AreEqual(50d, s.Cargo.Value.Value, 1e-9);
-            Assert.AreEqual(JumpState.NoNextSector, s.JumpState);
+            Assert.AreEqual(JumpState.NeedsDepth, s.JumpState, "the next jump needs the Iron Belt's last depth");
         }
 
         [Test]
@@ -433,7 +433,7 @@ namespace VoidProspector.Tests
             session.Upgrades.SetLevel(UpgradeEffect.CargoCapacity, 11);
             session.Upgrades.SetLevel(UpgradeEffect.DroneCount, 1);
 
-            var r = EconomySimulator.Run(session, new EconomySimulator.Settings { duration = 900, tapsPerSecond = 0 });
+            var r = EconomySimulator.Run(session, new EconomySimulator.Settings { duration = 900, tapsPerSecond = 0, buyJumpDrive = false });
             Assert.GreaterOrEqual(r.purchases.Count, 8, "keeps buying with no input");
             Assert.Less(r.Gaps(0, 900).Max(), 240, "no gap over 4 minutes");
             Assert.Greater(session.DroneCount, 1, "buys more drones");

@@ -3,7 +3,7 @@
 Idle mining game for mobile (portrait): tap and auto-mine meteors in space, collect mineral chunks with purity grades, sell, upgrade, go deeper and further. Original design; similar genre to Obelisk-style idle miners.
 
 - **GDD:** https://claude.ai/artifact/MXhwQ4eYDDQy4u3RpYsJHS (Claude Doc)
-- **Plan and status:** [docs/IMPLEMENTATION_PLAN.md](docs/IMPLEMENTATION_PLAN.md). Work phase by phase; each phase has a "Done when" check. Phases 0 (partly), 2, 3, 4 and 5 are done; Phase 6 (Sector 2, jump drive, drones, milestones) is built and waiting for a playtest.
+- **Plan and status:** [docs/IMPLEMENTATION_PLAN.md](docs/IMPLEMENTATION_PLAN.md). Work phase by phase; each phase has a "Done when" check. Phases 0 (partly), 2, 3, 4 and 5 are done; Phases 6 (Sector 2, jump drive, drones, milestones) and 7 (Sector 3, refinery, scanner, Mineral Codex) are built and waiting for a playtest.
 - **Prototype (throwaway):** `Assets/Prototype/`, see [docs/PROTOTYPE_PLAN.md](docs/PROTOTYPE_PLAN.md). Don't reuse its code or reference it.
 - **Economy:** [docs/economy/Economy.xlsx](docs/economy/Economy.xlsx), built from `EconomySimulator` output (see "Economy tooling").
 
@@ -27,16 +27,19 @@ Assets/_Project/
   Scripts/                 VoidProspector.asmdef (refs: Unity.InputSystem, UnityEngine.UI, Unity.TextMeshPro, DOTween.Modules, R3.Unity, UniTask, UniTask.DOTween)
     Core/        GameRoot (loads the save, builds the world at runtime), GameSession, GameNumber, NumberFormatter, TimeFormatter,
                  Formulas, WeightedRandom, SaveData, SaveSystem, SaveStore, SaveController
-    Data/        ScriptableObject definitions (incl. MilestoneDefinition), GameDatabase (+ Validate; offline and drone settings), MiningSettings
+    Data/        ScriptableObject definitions (incl. MilestoneDefinition), GameDatabase (+ Validate; offline, drone, refinery,
+                 codex and scanner settings), MiningSettings
     Economy/     Wallet, CargoHold, UpgradeTrack, Upgrades, EconomySimulator
-    Mining/      MeteorState, MeteorRoller (pure) + MeteorField, Meteor, ChunkField, Chunk, TapInput, AutoFire
-    Progression/ DepthProgress (one per sector), Milestones
+    Mining/      MeteorState, MeteorRoller, MeteorScan (pure) + MeteorField, Meteor, ChunkField, Chunk, TapInput, AutoFire
+    Progression/ DepthProgress (one per sector), Milestones, Codex
+    Refining/    Refinery (pure)
     Drones/      DroneBay, DroneTargeting (pure) + DroneSwarm (view)
     Idle/        OfflineEarnings (pure), OfflineController
     Fx/          GameFx (particles, shake, hit-stop, popups, toasts), GameAudio (generated sounds), ShapeSprites
-    UI/          Hud, UpgradePanel, StarMapPanel, WelcomeBackPopup, DebugPanel, UiFactory
+    UI/          Hud, UpgradePanel, StarMapPanel, RefineryPanel, CodexPanel, ScannerView, WelcomeBackPopup, DebugPanel,
+                 UiFactory (incl. Modal and ScrollList helpers for dialogs)
     Editor/      VoidProspector.Editor.asmdef — EconomyExport menu
-Assets/Tests/EditMode/     VoidProspector.Tests.EditMode.asmdef (149 tests)
+Assets/Tests/EditMode/     VoidProspector.Tests.EditMode.asmdef (170 tests)
 tools/economy/             build_economy_xlsx.py
 ```
 
@@ -47,7 +50,7 @@ Rules that keep this working:
 - Use `GameNumber` for anything that grows (credits, costs, HP, values) and `NumberFormatter` to display it. Formulas from the GDD live in `Formulas`.
 - Randomness that affects the economy goes through the session's seeded `System.Random` (`Session.Rng`); `UnityEngine.Random` is only for visuals.
 - `GameRoot` is the only scene object; the world and UI are built in code. UI is created through `UiFactory`.
-- Namespaces follow folders: `VoidProspector.Core`, `.Data`, `.Economy`, `.Mining`, `.Progression`, `.Drones`, `.Idle`, `.Fx`, `.UI`, `.EditorTools`.
+- Namespaces follow folders: `VoidProspector.Core`, `.Data`, `.Economy`, `.Mining`, `.Progression`, `.Refining`, `.Drones`, `.Idle`, `.Fx`, `.UI`, `.EditorTools`.
 
 ## Sectors, jump drive, drones, milestones (Phase 6)
 
@@ -57,6 +60,10 @@ Rules that keep this working:
 - Upgrades tied to a later sector use `UpgradeDefinition.requiresSector`; buy through `Session.TryBuy` (checks it), and use `Session.IsAvailable` to show or hide them.
 - **Drones**: count, damage factor and targeting rule come from upgrades; fire timing is the session's `DroneBay` (`Session.TickDrones`), so the simulator and offline earnings include drones. `DroneSwarm` only picks targets (`DroneTargeting.Pick`) and draws.
 - **Milestones**: data in `Data/Milestones/` (goal MineMineral / BreakMeteors / ReachDepth, credit reward, permanent value bonus). `Session.TryCollect` and `RegisterBreak` feed the counters; rewards are paid by the session on `Milestones.Completed`. The value bonus goes into chunk values via `MeteorRoller.RollChunk(..., valueMultiplier)`.
+- **Refinery** (Phase 7): pure `Refining/Refinery` owned by the session; load, collect and sell through `Session.TryLoadRefinery / CollectRefinery / SellRefinery`, advance with `Session.TickRefinery` (the RefineryPanel does it every frame; `OfflineController` runs it for the time away). Odds, times and losses per step are in `GameDatabase.refinery.stages`; show players `ExpectedValueRatio` rather than raw odds.
+- **Codex**: `Session.Codex` fills on collect (`TryCollect`) and on refining success. Chunk values use `Session.ValueMultiplier(mineral)` = milestone bonus × codex bonus; any new permanent value bonus goes in there.
+- **Scanner**: range is the ScannerRange upgrade (0 = not bought). `MeteorScan` (pure) reads a meteor's remaining contents and decides "rare"; `ScannerView` draws labels on the HUD's popup layer and listens to `MeteorField.Spawned`.
+- Dialogs (Star Map, Refinery, Codex) are modals on their own canvases and poll the session a few times a second while open, because the values they show change too often to bind one by one.
 - New sectors: add the asset with an `index` one higher than the last, a non-empty `unlockCost`, `backgroundColor`, and list it in `GameDatabase.sectors`; `Validate` checks the chain.
 
 ## Saving
@@ -68,7 +75,7 @@ Rules that keep this working:
 - File writes go only through `SaveStore` (temp file → backup → rename). Don't write the save file anywhere else.
 - `SaveController` decides when to save; call `RequestSave()` after something important happens (it coalesces to one write per frame).
 - Offline earnings: `OfflineEarnings` is pure and tested; it estimates idle income by running `EconomySimulator` (no taps, no purchases) on a copy of the session. Keep new idle income sources (drones, refinery) inside `GameSession` rules so the simulator, and so offline earnings, include them automatically.
-- Save format is **version 2** (Phase 6): per-sector depths, unlocked sector, milestones and counters, per-stack cargo value. `Migrate` turns version 1 saves into version 2.
+- Save format is **version 3**: per-sector depths, unlocked sector, milestones and counters, per-stack cargo value (v2), refinery batch and codex entries (v3). `Migrate` upgrades older saves step by step.
 - In the editor the save lives in `Application.persistentDataPath` too, so play sessions carry over. Use the debug panel's **Wipe save** for a fresh start and **Away 1h / 10h** to test offline earnings.
 
 ## TextMeshPro
@@ -124,7 +131,7 @@ Rules that keep this working:
 
 ## Tests
 
-- EditMode tests in `Assets/Tests/EditMode/`: formulas, formatter, `GameNumber`, weighted random, data validation (loads the real `GameDatabase.asset`), core loop, upgrades, depth, auto-sell, crits, saving, offline earnings, sectors and the jump drive, drones, milestones, and **pacing tests** that run the simulator on the real data: `EconomyTests.FirstFiveMinutes_BuySomethingEvery5To15Seconds`, `Phase6PacingTests.ReachingSector2_TakesAbout10Minutes` (7–14 min) and `Phase6PacingTests.IdleWithDrones_ProgressesSteadily`.
+- EditMode tests in `Assets/Tests/EditMode/`: formulas, formatter, `GameNumber`, weighted random, data validation (loads the real `GameDatabase.asset`), core loop, upgrades, depth, auto-sell, crits, saving, offline earnings, sectors and the jump drive, drones, milestones, and **pacing tests** that run the simulator on the real data: `EconomyTests.FirstFiveMinutes_BuySomethingEvery5To15Seconds`, `Phase6PacingTests.ReachingSector2_TakesAbout10Minutes` (7–14 min), `Phase6PacingTests.IdleWithDrones_ProgressesSteadily` and `Phase7PacingTests.ReachingSector3_TakesAbout30Minutes` (18–50 min).
 - Run them in Unity: Window → General → Test Runner → EditMode → Run All. (Through the Unity MCP connection `TestRunnerApi` is blocked; a reflection-based runner over `[Test]`/`[TestCase]` was used instead.)
 - New pure-C# logic gets EditMode tests. If you change balance data, the pacing tests must still pass.
 

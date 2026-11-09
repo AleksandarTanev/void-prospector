@@ -18,6 +18,8 @@ MonoBehaviour:
   - {fileID: 11400000, guid: 1ec2e228a89ae4046a2153ef1c20ec36, type: 2}
   - {fileID: 11400000, guid: 33941faba2cd45244b23e3c23b4b9295, type: 2}
   - {fileID: 11400000, guid: 411eff15a91b417faaa03adad1221132, type: 2}
+  - {fileID: 11400000, guid: 80513660e983444d9cc0b1a928741413, type: 2}
+  - {fileID: 11400000, guid: 3d9a7be171364515996a434de3d60f24, type: 2}
   purity: {fileID: 11400000, guid: c91df47a841889343bb9919ddedb5234, type: 2}
   meteorSizes:
   - {fileID: 11400000, guid: cf65096e8d8a887439f40700c10fe225, type: 2}
@@ -28,9 +30,11 @@ MonoBehaviour:
   meteorTypes:
   - {fileID: 11400000, guid: ca813b2a5584ea24990fdc46a0767f54, type: 2}
   - {fileID: 11400000, guid: 0bfaf26140a34de385f4c3c847440492, type: 2}
+  - {fileID: 11400000, guid: 79c12cc8aa8447209c8b15a8ae5b5c3c, type: 2}
   sectors:
   - {fileID: 11400000, guid: 4eab5782cbb674e458b24ee8be3c4098, type: 2}
   - {fileID: 11400000, guid: 89c1b5d09ebe4e2e8baa4a298272fb05, type: 2}
+  - {fileID: 11400000, guid: b53eb14a58ba4804a44347de575ef521, type: 2}
   upgrades:
   - {fileID: 11400000, guid: 5da46612da2e3274fa2885c849ebfb1b, type: 2}
   - {fileID: 11400000, guid: 4c1a85d366863f54d9a3328256269d96, type: 2}
@@ -40,6 +44,11 @@ MonoBehaviour:
   - {fileID: 11400000, guid: b6e793c0cee14ff18c0454a91ea4b23e, type: 2}
   - {fileID: 11400000, guid: be39f2e29c184ae6834f793e10fec74a, type: 2}
   - {fileID: 11400000, guid: b78e1a2f3d2149dc91a1a3d9faee479e, type: 2}
+  - {fileID: 11400000, guid: 7cf24b6ea41c480389c1fc6f629c7dc7, type: 2}
+  - {fileID: 11400000, guid: b1741431855641dfadf0417ce3ae4a08, type: 2}
+  - {fileID: 11400000, guid: cc3381a2ae34492fb3f43fdbf4bdf180, type: 2}
+  - {fileID: 11400000, guid: cd1ceb1eb98541e7a2ae6e070cc86c95, type: 2}
+  - {fileID: 11400000, guid: 4760355f71fd4ab4b67ab16dc63c9e5d, type: 2}
   milestones:
   - {fileID: 11400000, guid: eb285633b31c48299124df8256388020, type: 2}
   - {fileID: 11400000, guid: be213ad6fa3648ff96054d0113d02af6, type: 2}
@@ -48,6 +57,9 @@ MonoBehaviour:
   - {fileID: 11400000, guid: b7a9cf409f3c45d798d98b45ed1ea1f2, type: 2}
   - {fileID: 11400000, guid: d62a94bdd55e40adb1028c2d5b4690f1, type: 2}
   - {fileID: 11400000, guid: 5fe5e996f1774c20979c2a08e095eb6d, type: 2}
+  - {fileID: 11400000, guid: 02387a4f597247da8d961bda25569754, type: 2}
+  - {fileID: 11400000, guid: 1f29d239e5014ecbaf93ecdefa4ffd50, type: 2}
+  - {fileID: 11400000, guid: ffbeeb2081a64c0b959e828de22b9f63, type: 2}
   mining: {fileID: 11400000, guid: 11425b02f72f3cb44863694711625c50, type: 2}
   offline:
     capHours: 8
@@ -56,3 +68,29 @@ MonoBehaviour:
     incomeSampleSeconds: 600
   drones:
     fireInterval: 0.8
+  refinery:
+    unlockSector: 3
+    stages:
+    - seconds: 15
+      successChance: 0.85
+      failLoss: 0.1
+    - seconds: 30
+      successChance: 0.65
+      failLoss: 0.15
+    - seconds: 60
+      successChance: 0.4
+      failLoss: 0.25
+    - seconds: 120
+      successChance: 0.15
+      failLoss: 0.5
+    maxSuccessChance: 0.95
+  codex:
+    bonusPerGrade:
+    - 0.01
+    - 0.02
+    - 0.03
+    - 0.04
+    - 0.05
+  scanner:
+    rareMinTier: 3
+    rareMinChunks: 4

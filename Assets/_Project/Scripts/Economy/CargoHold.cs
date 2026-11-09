@@ -184,6 +184,40 @@ namespace VoidProspector.Economy
             return removed;
         }
 
+        /// <summary>Value of the whole (mineral, grade) stack.</summary>
+        public GameNumber ValueOf(MineralDefinition mineral, int grade) =>
+            _stacks.TryGetValue((mineral, grade), out var s) ? s.value : GameNumber.Zero;
+
+        public int FreeSpace => Math.Max(0, Capacity - Count);
+
+        /// <summary>Takes up to <paramref name="count"/> chunks from one (mineral, grade) stack. Returns how many and their value.</summary>
+        public (int count, GameNumber value) TakeFromStack(MineralDefinition mineral, int grade, int count)
+        {
+            if (count <= 0 || !_stacks.TryGetValue((mineral, grade), out var stack)) return (0, GameNumber.Zero);
+            int n = Math.Min(count, stack.count);
+            var v = ValueOf(stack, n);
+            stack.count -= n;
+            stack.value = stack.count > 0 ? GameNumber.Max(stack.value - v, GameNumber.Zero) : GameNumber.Zero;
+            if (stack.count == 0) _stacks.Remove((mineral, grade));
+            _value.Value = Count - n > 0 ? GameNumber.Max(Value - v, GameNumber.Zero) : GameNumber.Zero;
+            _count.Value = Count - n;
+            return (n, v);
+        }
+
+        /// <summary>Adds several chunks of one stack with a known total value (e.g. a refined batch). False if they don't all fit.</summary>
+        public bool TryAddStack(MineralDefinition mineral, int grade, int count, GameNumber value)
+        {
+            if (mineral == null || count <= 0) return false;
+            if (count > FreeSpace) return false;
+            var key = (mineral, grade);
+            if (!_stacks.TryGetValue(key, out var stack)) _stacks[key] = stack = new Stack();
+            stack.count += count;
+            stack.value += value;
+            _value.Value = Value + value;
+            _count.Value = Count + count;
+            return true;
+        }
+
         static GameNumber ValueOf(Stack stack, int n) => n >= stack.count ? stack.value : stack.value * n / stack.count;
 
         List<(int grade, Stack stack)> CheapestFirst(MineralDefinition mineral)

@@ -11,9 +11,9 @@ namespace VoidProspector.Core
     {
         /// <summary>
         /// Version written by this build. Older saves are migrated in <see cref="Migrate"/>.
-        /// 1: Phase 5. 2: depth per sector, unlocked sector, milestones, value per cargo stack.
+        /// 1: Phase 5. 2: depth per sector, unlocked sector, milestones, value per cargo stack. 3: refinery, codex.
         /// </summary>
-        public const int CurrentVersion = 2;
+        public const int CurrentVersion = 3;
 
         public static SaveData Capture(GameSession session, DateTime utcNow)
         {
@@ -41,6 +41,19 @@ namespace VoidProspector.Core
             foreach (var kv in ms.Mined) data.milestones.mined.Add(new CountSave { id = kv.Key.id, count = kv.Value });
             foreach (var kv in ms.Broken) data.milestones.broken.Add(new CountSave { id = kv.Key.id, count = kv.Value });
             data.milestones.brokenTotal = ms.BrokenTotal;
+
+            var r = session.Refinery;
+            data.refinery = new RefinerySave
+            {
+                mineralId = r.IsEmpty ? null : r.Mineral.id,
+                grade = r.Grade,
+                count = r.Count,
+                value = r.Value.Value,
+                progress = r.Progress,
+                targetGrade = r.TargetGrade,
+            };
+            foreach (var (mineral, grade) in session.Codex.Entries)
+                data.codex.Add(new CodexSave { mineralId = mineral.id, grade = grade });
             return data;
         }
 
@@ -92,6 +105,21 @@ namespace VoidProspector.Core
             var broken = data.milestones.broken.Select(c => (db.GetSector(c.id), c.count));
             session.Milestones.Restore(done, mined, broken, data.milestones.brokenTotal);
 
+            var codex = new List<(MineralDefinition, int)>();
+            foreach (var c in data.codex)
+            {
+                var mineral = db.GetMineral(c.mineralId);
+                if (mineral == null) warnings?.Add($"Unknown mineral '{c.mineralId}' in the codex skipped");
+                else if (c.grade >= 0 && c.grade < session.Purity.Count) codex.Add((mineral, c.grade));
+            }
+            session.Codex.Restore(codex);
+
+            var rs = data.refinery;
+            var refineMineral = string.IsNullOrEmpty(rs.mineralId) ? null : db.GetMineral(rs.mineralId);
+            if (!string.IsNullOrEmpty(rs.mineralId) && refineMineral == null)
+                warnings?.Add($"Unknown mineral '{rs.mineralId}' in the refinery skipped");
+            session.Refinery.Restore(refineMineral, rs.grade, rs.count, rs.value, rs.progress, rs.targetGrade);
+
             session.Wallet.Restore(data.credits);
             session.SetAutoSellBelow(data.autoSellBelow);
         }
@@ -117,6 +145,8 @@ namespace VoidProspector.Core
             data.milestones.done ??= new List<string>();
             data.milestones.mined ??= new List<CountSave>();
             data.milestones.broken ??= new List<CountSave>();
+            data.refinery ??= new RefinerySave();
+            data.codex ??= new List<CodexSave>();
             Migrate(data);
             return data;
         }
@@ -131,6 +161,7 @@ namespace VoidProspector.Core
                     data.sectors.Add(new SectorSave { id = data.sectorId, current = data.depth.current, deepest = data.depth.deepest, progress = data.depth.progress });
                 data.version = 2;
             }
+            // 2 → 3 only added fields (refinery, codex); their defaults mean "empty".
             data.depth = new DepthSave();   // legacy field, no longer read
             data.version = CurrentVersion;
         }

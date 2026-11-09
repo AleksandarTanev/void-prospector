@@ -19,6 +19,9 @@ namespace VoidProspector.Data
         public MiningSettings mining;
         public OfflineSettings offline = new OfflineSettings();
         public DroneSettings drones = new DroneSettings();
+        public RefinerySettings refinery = new RefinerySettings();
+        public CodexSettings codex = new CodexSettings();
+        public ScannerSettings scanner = new ScannerSettings();
 
         public MineralDefinition GetMineral(string id) => Find(minerals, id);
         public MeteorSizeDefinition GetMeteorSize(string id) => Find(meteorSizes, id);
@@ -73,6 +76,7 @@ namespace VoidProspector.Data
             ValidateMining(errors);
             ValidateOffline(errors);
             ValidateMilestones(errors);
+            ValidateRefinery(errors);
             if (drones == null) errors.Add("Drone settings are missing");
             else if (drones.fireInterval <= 0) errors.Add("Drones: fireInterval must be > 0");
 
@@ -166,6 +170,24 @@ namespace VoidProspector.Data
                     if (c.amount != Math.Floor(c.amount)) errors.Add($"Sector '{s.id}': mineral amounts are chunk counts and must be whole");
                 }
             }
+        }
+
+        void ValidateRefinery(List<string> errors)
+        {
+            if (refinery == null || codex == null || scanner == null) { errors.Add("Refinery, codex or scanner settings are missing"); return; }
+            int grades = purity != null ? purity.Count : 0;
+            if (refinery.stages == null || refinery.stages.Length != Math.Max(0, grades - 1))
+                errors.Add($"Refinery: needs {Math.Max(0, grades - 1)} stages (one per grade above the lowest)");
+            else
+                for (int i = 0; i < refinery.stages.Length; i++)
+                {
+                    var st = refinery.stages[i];
+                    if (st == null) { errors.Add($"Refinery: stage {i} is empty"); continue; }
+                    if (st.seconds <= 0) errors.Add($"Refinery: stage {i} needs seconds > 0");
+                    if (st.successChance <= 0) errors.Add($"Refinery: stage {i} can never succeed");
+                }
+            if (codex.bonusPerGrade == null || codex.bonusPerGrade.Length != grades)
+                errors.Add($"Codex: needs one bonus per purity grade ({grades})");
         }
 
         void ValidateMilestones(List<string> errors)

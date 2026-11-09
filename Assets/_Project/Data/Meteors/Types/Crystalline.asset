@@ -1,0 +1,27 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 6db17b537ea85c04ba30153d222d14d9, type: 3}
+  m_Name: Crystalline
+  m_EditorClassIdentifier: VoidProspector::VoidProspector.Data.MeteorTypeDefinition
+  id: crystalline
+  displayName: Crystalline
+  hpMultiplier: 0.6
+  bodyColor: {r: 0.42, g: 0.45, b: 0.7, a: 1}
+  composition:
+  - mineral: {fileID: 11400000, guid: 03b286707edf3f74c98f0b7854e57f24, type: 2}
+    weight: 20
+  - mineral: {fileID: 11400000, guid: 3d9a7be171364515996a434de3d60f24, type: 2}
+    weight: 40
+  - mineral: {fileID: 11400000, guid: 80513660e983444d9cc0b1a928741413, type: 2}
+    weight: 30
+  - mineral: {fileID: 11400000, guid: 411eff15a91b417faaa03adad1221132, type: 2}
+    weight: 10

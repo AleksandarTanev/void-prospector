@@ -73,6 +73,11 @@ namespace VoidProspector.UI
 
             BuildBottomPanel(canvas);
 
+            // Right edge, under the top bar: Codex, then Refinery (appears with Sector 3).
+            gameObject.AddComponent<CodexPanel>().Init(_root, canvas, 0);
+            gameObject.AddComponent<RefineryPanel>().Init(_root, canvas, 1);
+            gameObject.AddComponent<ScannerView>().Init(_root, PopupLayer);
+
             if (Debug.isDebugBuild) gameObject.AddComponent<DebugPanel>().Init(_root, canvas);
         }
 

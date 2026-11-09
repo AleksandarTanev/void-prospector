@@ -52,18 +52,43 @@ namespace VoidProspector.Idle
             }
             if (!probe.IsAway) return;
 
+            string refined = AdvanceRefinery(Math.Min(probe.awaySeconds, settings.CapSeconds));
+
             double rate = OfflineEarnings.EstimateIncomePerSecond(session, settings.incomeSampleSeconds);
             var result = OfflineEarnings.Calculate(sinceUtc, now, rate, settings);
             if (result.credits <= GameNumber.Zero)
             {
-                if (!session.HasIdleMining)
+                if (refined != null)
+                {
+                    _root.Saves.Save();
+                    _root.Fx.Toast(refined, HintColor);
+                }
+                else if (!session.HasIdleMining)
                     _root.Fx.Toast("Buy Auto-fire to mine while you're away", HintColor);
                 return;
             }
 
             session.Wallet.Add(result.credits);
             _root.Saves.Save();
-            _popup.Show(result);
+            _popup.Show(result, refined);
+        }
+
+        /// <summary>Runs the refinery for the time away; returns a line for the player, or null if it was idle.</summary>
+        string AdvanceRefinery(double seconds)
+        {
+            var session = _root.Session;
+            var r = session.Refinery;
+            if (!r.IsRunning) return null;
+            var mineral = r.Mineral;
+            int grade = r.Grade, count = r.Count;
+            session.TickRefinery(seconds);
+
+            if (r.IsEmpty) return $"Refinery: the {mineral.displayName} batch was lost while you were away";
+            string name = session.Purity[r.Grade].name;
+            string lost = r.Count < count ? $", {count - r.Count} lost" : "";
+            return r.Grade > grade
+                ? $"Refinery: {r.Count} {mineral.displayName} refined to {name}{lost}"
+                : $"Refinery: {mineral.displayName} still {name}{lost}";
         }
     }
 }

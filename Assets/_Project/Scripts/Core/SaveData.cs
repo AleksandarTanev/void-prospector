@@ -30,6 +30,10 @@ namespace VoidProspector.Core
         public List<UpgradeSave> upgrades = new List<UpgradeSave>();
         public CargoSave cargo = new CargoSave();
         public MilestoneSave milestones = new MilestoneSave();
+        /// <summary>Version 3+: the refinery's batch.</summary>
+        public RefinerySave refinery = new RefinerySave();
+        /// <summary>Version 3+: filled Mineral Codex entries.</summary>
+        public List<CodexSave> codex = new List<CodexSave>();
 
         public DateTime SavedAtUtc => new DateTime(Math.Max(0, Math.Min(savedAtUtcTicks, DateTime.MaxValue.Ticks)), DateTimeKind.Utc);
     }
@@ -84,6 +88,26 @@ namespace VoidProspector.Core
         /// <summary>Meteors broken per sector id.</summary>
         public List<CountSave> broken = new List<CountSave>();
         public long brokenTotal;
+    }
+
+    [Serializable]
+    public class RefinerySave
+    {
+        /// <summary>Empty = no batch.</summary>
+        public string mineralId;
+        public int grade;
+        public int count;
+        public double value;
+        public double progress;
+        /// <summary>0 = refine to the top grade.</summary>
+        public int targetGrade;
+    }
+
+    [Serializable]
+    public class CodexSave
+    {
+        public string mineralId;
+        public int grade;
     }
 
     [Serializable]

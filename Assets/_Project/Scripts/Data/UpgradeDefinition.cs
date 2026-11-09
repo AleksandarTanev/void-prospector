@@ -19,6 +19,10 @@ namespace VoidProspector.Data
         OfflineCap,
         /// <summary>Which meteor drones pick: 0 random, 1 nearest, 2 weakest, 3 richest (see DroneTargeting).</summary>
         DroneTargeting,
+        /// <summary>Chunks per refinery batch.</summary>
+        RefineryBatch,
+        /// <summary>Share of the failure loss prevented (1 = refining never loses chunks).</summary>
+        RefineryStabiliser,
     }
 
     [CreateAssetMenu(menuName = "Void Prospector/Upgrade", fileName = "Upgrade")]

@@ -7,6 +7,7 @@ using VoidProspector.Drones;
 using VoidProspector.Economy;
 using VoidProspector.Mining;
 using VoidProspector.Progression;
+using VoidProspector.Refining;
 
 namespace VoidProspector.Core
 {
@@ -38,7 +39,8 @@ namespace VoidProspector.Core
     }
 
     /// <summary>
-    /// The state of one play session: data, sectors, depths, wallet, cargo, upgrades, drones and milestones.
+    /// The state of one play session: data, sectors, depths, wallet, cargo, upgrades, drones, milestones, the
+    /// Mineral Codex and the refinery.
     /// Pure C#, so it can be tested and driven by the economy simulator.
     /// </summary>
     public sealed class GameSession
@@ -49,6 +51,8 @@ namespace VoidProspector.Core
         public Upgrades Upgrades { get; }
         public Milestones Milestones { get; }
         public DroneBay Drones { get; } = new DroneBay();
+        public Codex Codex { get; }
+        public Refinery Refinery { get; }
         public Random Rng { get; }
 
         /// <summary>All sectors in travel order (by index).</summary>
@@ -85,10 +89,13 @@ namespace VoidProspector.Core
             Upgrades = new Upgrades(database.upgrades, Wallet);
             Cargo = new CargoHold(CargoCapacity);
             Milestones = new Milestones(database.milestones, s => DepthsOf(s).Deepest + 1);
+            Codex = new Codex(database.codex);
+            Refinery = new Refinery(database.refinery ?? new RefinerySettings(), database.purity, Rng);
 
             // The session owns all sides, so these subscriptions live as long as the session.
             Upgrades.Get(UpgradeEffect.CargoCapacity)?.LevelRx.Subscribe(_ => Cargo.Capacity = CargoCapacity);
             Milestones.Completed.Subscribe(m => { if (m.rewardCredits > 0) Wallet.Add(m.rewardCredits); });
+            Refinery.Stepped.Subscribe(step => { if (step.success) Codex.Record(Refinery.Mineral, step.grade); });
         }
 
         public MiningSettings Mining => Database.mining;
@@ -126,6 +133,16 @@ namespace VoidProspector.Core
         public double DroneInterval => Database.drones != null ? Database.drones.fireInterval : 0.8;
         public TargetRule DroneTargetRule => DroneTargeting.RuleForLevel(Upgrades.Value(UpgradeEffect.DroneTargeting, 0));
 
+        /// <summary>Scanner range in world units around the ship; 0 = no scanner yet.</summary>
+        public float ScannerRange => (float)Upgrades.Value(UpgradeEffect.ScannerRange, 0);
+
+        public RefineryStats RefineryStats => new RefineryStats(
+            Upgrades.Value(UpgradeEffect.RefinerySpeed, 1),
+            Upgrades.Value(UpgradeEffect.RefineSuccess, 0),
+            Upgrades.Value(UpgradeEffect.RefineryStabiliser, 0));
+
+        public int RefineryBatchSize => Math.Max(1, (int)Math.Floor(Upgrades.Value(UpgradeEffect.RefineryBatch, 10)));
+
         /// <summary>Something mines without input (auto-fire or drones), so idle and offline income can be above 0.</summary>
         public bool HasIdleMining => AutoFireInterval > 0 || DroneCount > 0;
 
@@ -142,7 +159,10 @@ namespace VoidProspector.Core
         public MeteorSpawn RollMeteor() => MeteorRoller.RollMeteor(Database, Sector, Depth, Rng);
 
         public ChunkData RollChunk(MineralDefinition mineral, int depth, bool fromCore) =>
-            MeteorRoller.RollChunk(mineral, Purity, Sector, depth, fromCore, Rng, Milestones.ValueMultiplier(mineral));
+            MeteorRoller.RollChunk(mineral, Purity, Sector, depth, fromCore, Rng, ValueMultiplier(mineral));
+
+        /// <summary>Permanent value bonuses of a mineral: milestones × Codex entries.</summary>
+        public double ValueMultiplier(MineralDefinition mineral) => Milestones.ValueMultiplier(mineral) * Codex.ValueMultiplier(mineral);
 
         /// <summary>Damage for a tap (with the tap bonus) or an auto-fire shot, including a crit roll.</summary>
         public HitRoll RollHit(bool fromTap)
@@ -176,12 +196,54 @@ namespace VoidProspector.Core
             if (chunk.grade < AutoSellBelow && !NeedsForJump(chunk.mineral))
             {
                 Wallet.Add(chunk.value);
-                Milestones.RecordMined(chunk.mineral);
+                Found(chunk);
                 return CollectResult.AutoSold;
             }
             if (!Cargo.TryAdd(chunk)) return CollectResult.CargoFull;
-            Milestones.RecordMined(chunk.mineral);
+            Found(chunk);
             return CollectResult.Stored;
+        }
+
+        void Found(ChunkData chunk)
+        {
+            Milestones.RecordMined(chunk.mineral);
+            Codex.Record(chunk.mineral, chunk.grade);
+        }
+
+        // ---------- Refinery ----------
+
+        public bool RefineryUnlocked => UnlockedSector >= (Database.refinery != null ? Database.refinery.unlockSector : 3);
+
+        /// <summary>Moves up to a batch of one cargo stack into the empty refinery.</summary>
+        public bool TryLoadRefinery(MineralDefinition mineral, int grade)
+        {
+            if (!RefineryUnlocked || !Refinery.IsEmpty || grade >= Purity.TopGrade) return false;
+            var (count, value) = Cargo.TakeFromStack(mineral, grade, RefineryBatchSize);
+            if (count == 0) return false;
+            Refinery.Load(mineral, grade, count, value);
+            return true;
+        }
+
+        public void TickRefinery(double dt)
+        {
+            if (Refinery.IsRunning) Refinery.Tick(dt, RefineryStats);
+        }
+
+        /// <summary>Puts the batch back into the cargo hold (all of it, or nothing if there isn't room).</summary>
+        public bool CollectRefinery()
+        {
+            if (Refinery.IsEmpty || Cargo.FreeSpace < Refinery.Count) return false;
+            var (mineral, grade, count, value) = Refinery.Take();
+            return Cargo.TryAddStack(mineral, grade, count, value);
+        }
+
+        /// <summary>Sells the batch straight from the refinery.</summary>
+        public GameNumber SellRefinery()
+        {
+            if (Refinery.IsEmpty) return GameNumber.Zero;
+            var value = Refinery.Take().value;
+            Wallet.Add(value);
+            return value;
         }
 
         /// <summary>Sells the cargo hold, except the minerals kept for the jump drive; returns the credits earned.</summary>

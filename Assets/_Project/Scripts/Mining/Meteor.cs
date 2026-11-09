@@ -15,6 +15,9 @@ namespace VoidProspector.Mining
         public float Radius { get; private set; }
         public bool Active { get; private set; }
         public MeteorState State { get; private set; }
+        public MeteorSpawn Spawn => _spawn;
+        /// <summary>Chunks already spilled; the scanner reads what's left.</summary>
+        public int SpilledChunks => _nextChunk;
         /// <summary>Sum of the base values of the minerals still inside (drones' "richest" targeting).</summary>
         public double ContentValue
         {

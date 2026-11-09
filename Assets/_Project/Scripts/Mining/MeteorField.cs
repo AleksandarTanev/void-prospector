@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using UnityEngine;
+using R3;
 using UnityEngine.Pool;
 using VoidProspector.Core;
 using VoidProspector.Data;
@@ -14,6 +15,10 @@ namespace VoidProspector.Mining
         public IReadOnlyList<Meteor> Active => _active;
 
         readonly List<Meteor> _active = new List<Meteor>();
+        readonly Subject<Meteor> _spawned = new Subject<Meteor>();
+
+        /// <summary>Fires when a meteor enters the field (the scanner checks it for rare contents).</summary>
+        public Observable<Meteor> Spawned => _spawned;
         ObjectPool<Meteor> _pool;
         Transform _container;
         int _target;
@@ -83,6 +88,7 @@ namespace VoidProspector.Mining
             var m = _pool.Get();
             m.Launch(spawn, pos, vel);
             _active.Add(m);
+            _spawned.OnNext(m);
         }
 
         bool Overlaps(Vector2 p, float r)

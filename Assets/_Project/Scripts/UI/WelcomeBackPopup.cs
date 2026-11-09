@@ -17,7 +17,7 @@ namespace VoidProspector.UI
 
         GameRoot _root;
         RectTransform _canvas;
-        TextMeshProUGUI _away, _credits, _note;
+        TextMeshProUGUI _away, _credits, _note, _refined;
 
         public void Init(GameRoot root)
         {
@@ -32,8 +32,9 @@ namespace VoidProspector.UI
         }
 
         /// <summary>Shows what was earned. The credits are already in the wallet; this only tells the player.</summary>
-        public void Show(OfflineResult result)
+        public void Show(OfflineResult result, string refinedNote = null)
         {
+            _refined.text = refinedNote ?? "";
             _away.text = $"You were away for {TimeFormatter.Format(result.awaySeconds)}";
             _credits.text = "+$ " + NumberFormatter.Format(result.credits);
             _note.text = result.capped
@@ -59,21 +60,24 @@ namespace VoidProspector.UI
 
             var panel = UiFactory.Panel("Panel", _canvas, PanelColor).rectTransform;
             panel.anchorMin = panel.anchorMax = new Vector2(0.5f, 0.55f);
-            panel.sizeDelta = new Vector2(860, 620);
+            panel.sizeDelta = new Vector2(860, 680);
 
             var title = UiFactory.Text(panel, "Title", "WELCOME BACK", 64, TextAlignmentOptions.Center, Color.white);
             title.fontStyle = FontStyles.Bold;
-            Row(title.rectTransform, 520, 80);
+            Row(title.rectTransform, 580, 80);
 
             _away = UiFactory.Text(panel, "Away", "", 38, TextAlignmentOptions.Center, MutedColor);
-            Row(_away.rectTransform, 440, 50);
+            Row(_away.rectTransform, 500, 50);
 
             _credits = UiFactory.Text(panel, "Credits", "", 96, TextAlignmentOptions.Center, CreditsColor);
             _credits.fontStyle = FontStyles.Bold;
-            Row(_credits.rectTransform, 300, 120);
+            Row(_credits.rectTransform, 360, 120);
 
             _note = UiFactory.Text(panel, "Note", "", 30, TextAlignmentOptions.Center, MutedColor);
-            Row(_note.rectTransform, 230, 40);
+            Row(_note.rectTransform, 290, 40);
+
+            _refined = UiFactory.Text(panel, "Refined", "", 30, TextAlignmentOptions.Center, CreditsColor);
+            Row(_refined.rectTransform, 230, 40);
 
             var collect = UiFactory.Button(panel, "Collect", CollectColor, Close, out var label, 52);
             label.fontStyle = FontStyles.Bold;
