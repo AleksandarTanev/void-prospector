@@ -17,7 +17,7 @@ How to build the game described in the Game Design Document (GDD), step by step.
 | Input | New Input System only |
 | Packages | Input System 1.20, uGUI 2.6 (includes TextMeshPro), Test Framework 1.8, URP 17.6 |
 | Prototype | Built in `Assets/Prototype/` (Phase 1, steps 1–9); see [PROTOTYPE_PLAN.md](PROTOTYPE_PLAN.md) |
-| Real game | Phases 2–5 done; Phases 6 (Sector 2, drones, milestones) and 7 (Sector 3, refinery, scanner, codex) built in `Assets/_Project/`, scene `Assets/_Project/Scenes/Game.unity` |
+| Real game | Phases 2–5 done; Phases 6 (Sector 2, drones, milestones) and 7 (Sector 3, refinery, scanner, codex) built; Phase 8 tooling (analytics, simulated tuning) done, playtests to do in `Assets/_Project/`, scene `Assets/_Project/Scenes/Game.unity` |
 
 Work through the phases in order. Each phase ends with a **Done when** check. Don't start the next phase until it passes. The early phases are deliberately ugly: they prove that the game is fun before any art is made. Phase 1 is a quick, throwaway gameplay prototype; the real game is built from Phase 2 onward.
 
@@ -313,11 +313,35 @@ Open questions:
 
 At this point the MVP checklist in the GDD is done (Sectors 1–3).
 
-- [ ] Analytics events (Unity Analytics or Firebase): session length, time to each sector, upgrades bought, where players quit
+- [x] Analytics events: session length, time to each sector, upgrades bought, where players quit (local event log for now; Unity Analytics or Firebase can be added as another sink)
 - [ ] Hand out test builds to 5–10 people (Google Play internal testing track)
-- [ ] Compare real timings with the GDD's pacing targets and adjust the ScriptableObject values
-- [ ] Look for walls: any point where the next meaningful upgrade takes more than about 10 minutes of active play
+- [x] Compare timings with the GDD's pacing targets and adjust the ScriptableObject values (done with the simulator; redo with real tester data)
+- [x] Look for walls: any point where the next meaningful upgrade takes more than about 10 minutes of active play (simulator: none in the first hour; check real data)
 - [ ] Answer the GDD's open questions using what you observed
+- [x] EditMode tests (179 in total, all passing in Unity), including a first-hour "no walls, Sector 2 at 8–13 min, Sector 3 at 24–40 min" check
+- [ ] Play-mode check of Phases 6–8 in the editor (not run by Claude: the Unity connection can't back up the editor save)
+
+**Simulated tuning** (3 seeds, 60 minutes, active player at 3 taps/s; `Void Prospector → Pacing Report`):
+
+| | Before | After | GDD target |
+| --- | --- | --- | --- |
+| First 5 min, median between purchases | 4.7–6.6 s (one seed failed the test) | 6–7 s | 5–15 s |
+| Sector 2 reached | 7.4 min | 10.4–10.7 min | ~10 min |
+| Sector 3 reached | 16.7–18.2 min | 31–32.4 min | ~30 min |
+| Longest gap in the first hour | 3.2 min | about 7 min (saving for the Sector 3 jump) | under 10 min |
+| Upgrades maxed by minute 60 | nearly all | none of the main tracks | — |
+
+Changes: Sector 1 upgrade base costs ×1.2 (Drill 30, Auto-fire 240, Crit 480, Collector 120, Cargo 192); Sector 2–3 upgrades' cost growth +0.08; max levels Drill Damage 200, Cargo 140, Drone Damage 120; jump drive prices Iron Belt **$15,000** + 40 Copper, Crystal Drift **$300,000** + 40 Iron. The simulator now keeps buying upgrades worth up to 5% of the jump price while it saves for a jump (a real player would too); before, it bought nothing for 10+ minutes. The economy workbook was regenerated.
+
+Median gaps after minute 5 stay below the GDD's (10 s in minutes 5–15 against 20–60 s; ~23 s in minutes 30–60 against 1–3 min). Part of that is the simulator buying one level at a time across 13 tracks; check it against testers before slowing the game further.
+
+**Analytics** (`Scripts/Analytics/`): `GameAnalytics` (pure, tested) turns session events into flat events; `AnalyticsController` runs it and counts play time; `JsonLinesSink` appends them to `analytics.jsonl` in `Application.persistentDataPath` (rotates at 5 MB). Events: `session_start` (launch / resume / reload), `session_end` (pause / quit / reload, with session length, time since the last purchase, last upgrade, credits, cargo, drones, milestones, codex), `upgrade_bought`, `sector_unlocked`, `travel`, `depth_unlocked`, `milestone`, `codex_entry`, `refine_done`, `refine_lost`, `offline_paid`. Every event carries `play_s` (lifetime active play seconds, saved in the save since version 4), `sector` and `depth`. To add Firebase or Unity Analytics later, implement `IAnalyticsSink` and send to both.
+
+**Running a playtest**
+1. Set a real package name first (Player Settings → Android → Package Name; it is still `com.DefaultCompany.2D-URP`) and the company and product names. Then build an Android development build, or a release build for the Play internal testing track.
+2. Ask testers to play normally, with no instructions, and to send their log afterwards. On Android it's in `Android/data/<package name>/files/analytics.jsonl` (USB or a file manager); in the editor, **Void Prospector → Open Save and Analytics Folder**. The DEV panel's **Analytics** button flushes the log and prints its path.
+3. Put the files in one folder, named after each tester, and run `python tools/analytics/summarize.py <folder> > report.md`. It reports play time, sessions, first-5-minute purchase gaps, time to Sectors 2 and 3 (with ✓ / ✗ against the targets), walls over 10 minutes with where they happened, and where each tester stopped.
+4. Tune the ScriptableObjects, rerun the pacing report and tests, repeat.
 
 **Done when:** testers play for 30+ minutes without being asked to, and the pacing roughly matches the targets.
 

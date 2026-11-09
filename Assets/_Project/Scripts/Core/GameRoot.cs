@@ -2,6 +2,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using UnityEngine;
+using VoidProspector.Analytics;
 using VoidProspector.Data;
 using VoidProspector.Drones;
 using VoidProspector.Fx;
@@ -48,6 +49,7 @@ namespace VoidProspector.Core
         public DroneSwarm Drones { get; private set; }
         public SaveController Saves { get; private set; }
         public OfflineController Offline { get; private set; }
+        public AnalyticsController Analytics { get; private set; }
 
         void Awake()
         {
@@ -93,6 +95,8 @@ namespace VoidProspector.Core
 
             Saves = gameObject.AddComponent<SaveController>();
             Saves.Init(this, store);
+            Analytics = gameObject.AddComponent<AnalyticsController>();
+            Analytics.Init(this, Path.Combine(Application.persistentDataPath, "analytics.jsonl"));
             Offline = gameObject.AddComponent<OfflineController>();
             Offline.Init(this, save != null ? save.SavedAtUtc : (System.DateTime?)null);
         }
@@ -100,6 +104,8 @@ namespace VoidProspector.Core
         /// <summary>Moves the ship to another unlocked sector: saves, then rebuilds the world there.</summary>
         public bool TravelTo(SectorDefinition sector)
         {
+            if (!Session.IsUnlocked(sector) || sector == Session.Sector) return false;
+            Analytics.Game.Travel(sector.id);
             if (!Session.TravelTo(sector)) return false;
             Saves.SaveAndReload();
             return true;

@@ -13,8 +13,9 @@ namespace VoidProspector.Economy
     /// Plays the game without visuals, using the real <see cref="GameSession"/> and data, to check pacing.
     /// Player model: taps one meteor at a steady rate, auto-fire and drones help once bought, chunks arrive after a
     /// delay, sells when the hold is full or when selling pays for the next upgrade, always buys the cheapest upgrade,
-    /// and always mines at the deepest unlocked depth. Once the jump drive is available it stops buying upgrades,
-    /// saves for the jump, buys it and travels to the new sector.
+    /// and always mines at the deepest unlocked depth. Once the jump drive is available it saves for it (still
+    /// buying upgrades that cost at most <see cref="Settings.cheapWhileSaving"/> of the jump price), buys it and
+    /// travels to the new sector.
     /// </summary>
     public static class EconomySimulator
     {
@@ -34,6 +35,8 @@ namespace VoidProspector.Economy
             public bool buyUpgrades = true;
             /// <summary>Saves for and buys the jump drive once it's available, then travels to the new sector.</summary>
             public bool buyJumpDrive = true;
+            /// <summary>While saving for the jump drive, upgrades up to this share of its credit price are still bought.</summary>
+            public double cheapWhileSaving = 0.05;
         }
 
         public struct Purchase
@@ -75,6 +78,30 @@ namespace VoidProspector.Economy
                 var g = Gaps(from, to).OrderBy(x => x).ToList();
                 if (g.Count == 0) return double.PositiveInfinity;
                 return g.Count % 2 == 1 ? g[g.Count / 2] : (g[g.Count / 2 - 1] + g[g.Count / 2]) / 2;
+            }
+
+            /// <summary>Longest gap between purchases in [from, to), or 0 if there were none.</summary>
+            public double LongestGap(double from, double to)
+            {
+                var g = Gaps(from, to);
+                return g.Count > 0 ? g.Max() : 0;
+            }
+
+            /// <summary>Jump times and purchase gaps per period, for the pacing report.</summary>
+            public string PacingSummary()
+            {
+                var inv = CultureInfo.InvariantCulture;
+                var sb = new StringBuilder();
+                sb.Append("  jumps: ");
+                sb.Append(jumps.Count == 0 ? "none" : string.Join(", ", jumps.Select(j => string.Format(inv, "{0} at {1:0.0} min", j.sectorId, j.time / 60))));
+                sb.AppendLine();
+                double[] edges = { 0, 300, 900, 1800, 3600 };
+                for (int i = 0; i + 1 < edges.Length; i++)
+                    sb.AppendLine(string.Format(inv, "  {0:0}-{1:0} min: median gap {2:0.0} s, longest {3:0} s, {4} purchases",
+                        edges[i] / 60, edges[i + 1] / 60, MedianGap(edges[i], edges[i + 1]), LongestGap(edges[i], edges[i + 1]),
+                        Gaps(edges[i], edges[i + 1]).Count));
+                sb.Append(string.Format(inv, "  deepest depth {0}, {1} meteors broken, $ {2} earned", deepest + 1, meteorsBroken, NumberFormatter.Format(earned)));
+                return sb.ToString();
             }
 
             public string ToCsv()
@@ -180,6 +207,8 @@ namespace VoidProspector.Economy
                             NewMeteor();
                             retarget = s.retargetDelay;
                         }
+                        else if (session.NextSector != null)
+                            BuyCheapest(session, result, t, session.NextSector.UnlockCredits * s.cheapWhileSaving);
                     }
                     else BuyCheapest(session, result, t);
                 }
@@ -203,7 +232,9 @@ namespace VoidProspector.Economy
             return true;
         }
 
-        static void BuyCheapest(GameSession session, Result result, double t)
+        static void BuyCheapest(GameSession session, Result result, double t) => BuyCheapest(session, result, t, double.MaxValue);
+
+        static void BuyCheapest(GameSession session, Result result, double t, GameNumber maxCost)
         {
             while (true)
             {
@@ -216,6 +247,7 @@ namespace VoidProspector.Economy
                 if (cheapest == null) return;
 
                 var cost = cheapest.NextCost;
+                if (cost > maxCost) return;
                 if (session.Wallet.Credits + session.SellableValue < cost) return;
                 if (session.Wallet.Credits < cost) session.SellCargo();
                 if (session.TryBuy(cheapest, BuyMode.One) == 0) return;

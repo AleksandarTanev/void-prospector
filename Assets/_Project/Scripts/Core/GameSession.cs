@@ -53,6 +53,8 @@ namespace VoidProspector.Core
         public DroneBay Drones { get; } = new DroneBay();
         public Codex Codex { get; }
         public Refinery Refinery { get; }
+        /// <summary>Lifetime play time and session count (analytics).</summary>
+        public PlayStats Stats { get; } = new PlayStats();
         public Random Rng { get; }
 
         /// <summary>All sectors in travel order (by index).</summary>

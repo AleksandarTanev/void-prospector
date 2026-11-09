@@ -22,6 +22,6 @@ MonoBehaviour:
   offAtLevelZero: 0
   requiresSector: 3
   baseCost: 15000
-  growth: 1.3
+  growth: 1.38
   maxLevel: 18
   costMineral: {fileID: 0}

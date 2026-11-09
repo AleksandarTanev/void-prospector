@@ -33,7 +33,7 @@ namespace VoidProspector.UI
             _panel.anchorMin = _panel.anchorMax = new Vector2(0, 1);
             _panel.pivot = new Vector2(0, 1);
             _panel.anchoredPosition = new Vector2(16, -Hud.TopBarHeight - 90);
-            _panel.sizeDelta = new Vector2(300, 9 * 84 + 16);
+            _panel.sizeDelta = new Vector2(300, 10 * 84 + 16);
 
             int i = 0;
             AddButton("+$ 1K", () => root.Session.Wallet.Add(1_000), ref i);
@@ -45,6 +45,7 @@ namespace VoidProspector.UI
             AddButton("Away 1h", () => root.Saves.PretendAwayAndRestart(System.TimeSpan.FromHours(1)), ref i);
             AddButton("Away 10h", () => root.Saves.PretendAwayAndRestart(System.TimeSpan.FromHours(10)), ref i);
             AddButton("Wipe save", () => root.Saves.WipeAndRestart(), ref i);
+            AddButton("Analytics", ShowAnalytics, ref i);
 
             _panel.gameObject.SetActive(false);
         }
@@ -60,6 +61,15 @@ namespace VoidProspector.UI
             rt.offsetMax = new Vector2(-8, -8 - index * 84);
             index++;
             return text;
+        }
+
+        /// <summary>Flushes the event log and says where it is (also printed to the console).</summary>
+        void ShowAnalytics()
+        {
+            var a = _root.Analytics;
+            a.Game.Flush();
+            Debug.Log($"Analytics: {a.Sink.Written} events written to {a.Sink.FilePath}" + (a.Sink.Error != null ? $" (last error: {a.Sink.Error})" : ""));
+            _root.Fx.Toast($"{a.Sink.Written} events logged (path in the console)", new Color(0.75f, 0.85f, 1f));
         }
 
         void ToggleSpeed()

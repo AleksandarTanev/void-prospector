@@ -34,6 +34,8 @@ namespace VoidProspector.Core
         public RefinerySave refinery = new RefinerySave();
         /// <summary>Version 3+: filled Mineral Codex entries.</summary>
         public List<CodexSave> codex = new List<CodexSave>();
+        /// <summary>Version 4+: lifetime play time and sessions.</summary>
+        public StatsSave stats = new StatsSave();
 
         public DateTime SavedAtUtc => new DateTime(Math.Max(0, Math.Min(savedAtUtcTicks, DateTime.MaxValue.Ticks)), DateTimeKind.Utc);
     }
@@ -101,6 +103,15 @@ namespace VoidProspector.Core
         public double progress;
         /// <summary>0 = refine to the top grade.</summary>
         public int targetGrade;
+    }
+
+    [Serializable]
+    public class StatsSave
+    {
+        /// <summary>Active play time in real seconds, all sessions.</summary>
+        public double playSeconds;
+        public int sessions;
+        public long firstPlayUtcTicks;
     }
 
     [Serializable]

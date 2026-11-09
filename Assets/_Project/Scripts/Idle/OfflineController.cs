@@ -69,6 +69,7 @@ namespace VoidProspector.Idle
             }
 
             session.Wallet.Add(result.credits);
+            _root.Analytics?.Game.Offline(result.awaySeconds, result.paidSeconds, result.credits);
             _root.Saves.Save();
             _popup.Show(result, refined);
         }

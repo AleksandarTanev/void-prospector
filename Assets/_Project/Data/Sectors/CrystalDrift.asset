@@ -27,7 +27,7 @@ MonoBehaviour:
   signatureMineral: {fileID: 11400000, guid: 80513660e983444d9cc0b1a928741413, type: 2}
   unlockCost:
   - mineral: {fileID: 0}
-    amount: 50000
+    amount: 300000
   - mineral: {fileID: 11400000, guid: 33941faba2cd45244b23e3c23b4b9295, type: 2}
     amount: 40
   backgroundColor: {r: 0.05, g: 0.03, b: 0.11, a: 1}

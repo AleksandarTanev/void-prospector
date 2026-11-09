@@ -3,7 +3,7 @@
 Idle mining game for mobile (portrait): tap and auto-mine meteors in space, collect mineral chunks with purity grades, sell, upgrade, go deeper and further. Original design; similar genre to Obelisk-style idle miners.
 
 - **GDD:** https://claude.ai/artifact/MXhwQ4eYDDQy4u3RpYsJHS (Claude Doc)
-- **Plan and status:** [docs/IMPLEMENTATION_PLAN.md](docs/IMPLEMENTATION_PLAN.md). Work phase by phase; each phase has a "Done when" check. Phases 0 (partly), 2, 3, 4 and 5 are done; Phases 6 (Sector 2, jump drive, drones, milestones) and 7 (Sector 3, refinery, scanner, Mineral Codex) are built and waiting for a playtest.
+- **Plan and status:** [docs/IMPLEMENTATION_PLAN.md](docs/IMPLEMENTATION_PLAN.md). Work phase by phase; each phase has a "Done when" check. Phases 0 (partly), 2, 3, 4 and 5 are done; Phases 6 (Sector 2, jump drive, drones, milestones) and 7 (Sector 3, refinery, scanner, Mineral Codex) are built; Phase 8 (playtest and tune) has its tooling and a simulator-based tuning pass done, and needs real testers.
 - **Prototype (throwaway):** `Assets/Prototype/`, see [docs/PROTOTYPE_PLAN.md](docs/PROTOTYPE_PLAN.md). Don't reuse its code or reference it.
 - **Economy:** [docs/economy/Economy.xlsx](docs/economy/Economy.xlsx), built from `EconomySimulator` output (see "Economy tooling").
 
@@ -35,12 +35,14 @@ Assets/_Project/
     Refining/    Refinery (pure)
     Drones/      DroneBay, DroneTargeting (pure) + DroneSwarm (view)
     Idle/        OfflineEarnings (pure), OfflineController
+    Analytics/   AnalyticsEvent, GameAnalytics, JsonLinesSink (pure) + AnalyticsController
     Fx/          GameFx (particles, shake, hit-stop, popups, toasts), GameAudio (generated sounds), ShapeSprites
     UI/          Hud, UpgradePanel, StarMapPanel, RefineryPanel, CodexPanel, ScannerView, WelcomeBackPopup, DebugPanel,
                  UiFactory (incl. Modal and ScrollList helpers for dialogs)
-    Editor/      VoidProspector.Editor.asmdef — EconomyExport menu
-Assets/Tests/EditMode/     VoidProspector.Tests.EditMode.asmdef (170 tests)
+    Editor/      VoidProspector.Editor.asmdef — EconomyExport, PlaytestTools (Pacing Report, Open Save and Analytics Folder) menus
+Assets/Tests/EditMode/     VoidProspector.Tests.EditMode.asmdef (179 tests)
 tools/economy/             build_economy_xlsx.py
+tools/analytics/           summarize.py (playtest logs → pacing report)
 ```
 
 Rules that keep this working:
@@ -50,7 +52,7 @@ Rules that keep this working:
 - Use `GameNumber` for anything that grows (credits, costs, HP, values) and `NumberFormatter` to display it. Formulas from the GDD live in `Formulas`.
 - Randomness that affects the economy goes through the session's seeded `System.Random` (`Session.Rng`); `UnityEngine.Random` is only for visuals.
 - `GameRoot` is the only scene object; the world and UI are built in code. UI is created through `UiFactory`.
-- Namespaces follow folders: `VoidProspector.Core`, `.Data`, `.Economy`, `.Mining`, `.Progression`, `.Refining`, `.Drones`, `.Idle`, `.Fx`, `.UI`, `.EditorTools`.
+- Namespaces follow folders: `VoidProspector.Core`, `.Data`, `.Economy`, `.Mining`, `.Progression`, `.Refining`, `.Drones`, `.Idle`, `.Analytics`, `.Fx`, `.UI`, `.EditorTools`.
 
 ## Sectors, jump drive, drones, milestones (Phase 6)
 
@@ -75,7 +77,14 @@ Rules that keep this working:
 - File writes go only through `SaveStore` (temp file → backup → rename). Don't write the save file anywhere else.
 - `SaveController` decides when to save; call `RequestSave()` after something important happens (it coalesces to one write per frame).
 - Offline earnings: `OfflineEarnings` is pure and tested; it estimates idle income by running `EconomySimulator` (no taps, no purchases) on a copy of the session. Keep new idle income sources (drones, refinery) inside `GameSession` rules so the simulator, and so offline earnings, include them automatically.
-- Save format is **version 3**: per-sector depths, unlocked sector, milestones and counters, per-stack cargo value (v2), refinery batch and codex entries (v3). `Migrate` upgrades older saves step by step.
+- Save format is **version 4**: per-sector depths, unlocked sector, milestones and counters, per-stack cargo value (v2), refinery batch and codex entries (v3), play statistics (v4). `Migrate` upgrades older saves step by step.
+
+## Analytics (Phase 8)
+
+- `GameAnalytics` subscribes to the session and sends flat `AnalyticsEvent`s (name + string/number/bool params) to an `IAnalyticsSink`. Every event gets `play_s` (lifetime active seconds, `Session.Stats`), `sector` and `depth`. Don't put a param named like a common field.
+- The only sink now is `JsonLinesSink` (`persistentDataPath/analytics.jsonl`). A vendor backend (Firebase, Unity Analytics) is a new `IAnalyticsSink`; gameplay code never calls a vendor SDK directly.
+- New gameplay systems: add their events in `GameAnalytics` (subscribe to the model's observables), not in MonoBehaviours. Analytics must never throw into gameplay.
+- `tools/analytics/summarize.py` reads testers' logs; keep event and param names stable or update the script.
 - In the editor the save lives in `Application.persistentDataPath` too, so play sessions carry over. Use the debug panel's **Wipe save** for a fresh start and **Away 1h / 10h** to test offline earnings.
 
 ## TextMeshPro
@@ -132,7 +141,8 @@ Rules that keep this working:
 ## Tests
 
 - EditMode tests in `Assets/Tests/EditMode/`: formulas, formatter, `GameNumber`, weighted random, data validation (loads the real `GameDatabase.asset`), core loop, upgrades, depth, auto-sell, crits, saving, offline earnings, sectors and the jump drive, drones, milestones, and **pacing tests** that run the simulator on the real data: `EconomyTests.FirstFiveMinutes_BuySomethingEvery5To15Seconds`, `Phase6PacingTests.ReachingSector2_TakesAbout10Minutes` (7–14 min), `Phase6PacingTests.IdleWithDrones_ProgressesSteadily` and `Phase7PacingTests.ReachingSector3_TakesAbout30Minutes` (18–50 min).
-- Run them in Unity: Window → General → Test Runner → EditMode → Run All. (Through the Unity MCP connection `TestRunnerApi` is blocked; a reflection-based runner over `[Test]`/`[TestCase]` was used instead.)
+- Run them in Unity: Window → General → Test Runner → EditMode → Run All. (Through the Unity MCP connection `TestRunnerApi` is blocked; a reflection-based runner over `[Test]`/`[TestCase]` works: find the `VoidProspector.Tests.EditMode` assembly, call `[SetUp]`, the test and `[TearDown]` by attribute name, convert `[TestCase]` arguments to the parameter types. `System.Diagnostics.Stopwatch` isn't available there; use `EditorApplication.timeSinceStartup`.)
+- The MCP connection can't write files outside the project (it needs a user prompt it can't show), so it can't back up `persistentDataPath`. Don't enter play mode through it unless the user agrees to their editor save changing.
 - New pure-C# logic gets EditMode tests. If you change balance data, the pacing tests must still pass.
 
 ## Economy tooling
@@ -141,7 +151,7 @@ Rules that keep this working:
 2. `python tools/economy/build_economy_xlsx.py docs/economy/data docs/economy/Economy.xlsx` (needs `openpyxl`).
 3. Open in Excel (formulas recalculate on open). LibreOffice isn't installed on this machine.
 
-Current pacing (3 seeds): median time between purchases 6–7 s in minutes 0–5 (GDD target 5–15 s), ~18 s in 5–15, ~38 s in 15–30.
+Current pacing (3 seeds, 60 min, after the Phase 8 tuning): median time between purchases 6–7 s in minutes 0–5 (GDD target 5–15 s); Sector 2 at ~10.5 min, Sector 3 at ~32 min; longest gap about 7 min. **Void Prospector → Pacing Report** prints this. The economy workbook only covers Sector 1's data (the simulations in it run through the jumps).
 
 ## Workflow
 

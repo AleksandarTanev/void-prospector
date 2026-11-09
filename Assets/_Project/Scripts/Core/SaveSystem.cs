@@ -12,8 +12,9 @@ namespace VoidProspector.Core
         /// <summary>
         /// Version written by this build. Older saves are migrated in <see cref="Migrate"/>.
         /// 1: Phase 5. 2: depth per sector, unlocked sector, milestones, value per cargo stack. 3: refinery, codex.
+        /// 4: play statistics.
         /// </summary>
-        public const int CurrentVersion = 3;
+        public const int CurrentVersion = 4;
 
         public static SaveData Capture(GameSession session, DateTime utcNow)
         {
@@ -54,6 +55,14 @@ namespace VoidProspector.Core
             };
             foreach (var (mineral, grade) in session.Codex.Entries)
                 data.codex.Add(new CodexSave { mineralId = mineral.id, grade = grade });
+
+            var st = session.Stats;
+            data.stats = new StatsSave
+            {
+                playSeconds = st.PlaySeconds,
+                sessions = st.Sessions,
+                firstPlayUtcTicks = st.FirstPlayUtc == DateTime.MinValue ? 0 : st.FirstPlayUtc.Ticks,
+            };
             return data;
         }
 
@@ -120,6 +129,8 @@ namespace VoidProspector.Core
                 warnings?.Add($"Unknown mineral '{rs.mineralId}' in the refinery skipped");
             session.Refinery.Restore(refineMineral, rs.grade, rs.count, rs.value, rs.progress, rs.targetGrade);
 
+            session.Stats.Restore(data.stats.playSeconds, data.stats.sessions, data.stats.firstPlayUtcTicks);
+
             session.Wallet.Restore(data.credits);
             session.SetAutoSellBelow(data.autoSellBelow);
         }
@@ -147,6 +158,7 @@ namespace VoidProspector.Core
             data.milestones.broken ??= new List<CountSave>();
             data.refinery ??= new RefinerySave();
             data.codex ??= new List<CodexSave>();
+            data.stats ??= new StatsSave();
             Migrate(data);
             return data;
         }
@@ -161,7 +173,7 @@ namespace VoidProspector.Core
                     data.sectors.Add(new SectorSave { id = data.sectorId, current = data.depth.current, deepest = data.depth.deepest, progress = data.depth.progress });
                 data.version = 2;
             }
-            // 2 → 3 only added fields (refinery, codex); their defaults mean "empty".
+            // 2 → 3 and 3 → 4 only added fields (refinery, codex, stats); their defaults mean "empty".
             data.depth = new DepthSave();   // legacy field, no longer read
             data.version = CurrentVersion;
         }
