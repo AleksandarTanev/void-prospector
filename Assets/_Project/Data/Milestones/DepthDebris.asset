@@ -1,0 +1,23 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 5b1f0c7e2a9d4e61b3c8f07a6d2e4c19, type: 3}
+  m_Name: DepthDebris
+  m_EditorClassIdentifier: VoidProspector::VoidProspector.Data.MilestoneDefinition
+  id: depth_debris_10
+  displayName:
+  goal: 2
+  mineral: {fileID: 0}
+  sector: {fileID: 11400000, guid: 4eab5782cbb674e458b24ee8be3c4098, type: 2}
+  target: 10
+  rewardCredits: 0
+  valueBonus: 0.05
+  bonusMineral: {fileID: 0}

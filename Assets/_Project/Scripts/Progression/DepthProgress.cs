@@ -57,7 +57,15 @@ namespace VoidProspector.Progression
             return true;
         }
 
-        /// <summary>Unlocks up to a depth without breaking meteors (debug tools and, later, loading a save).</summary>
+        /// <summary>Restores the exact state when loading a save; values are clamped to this sector's depths.</summary>
+        public void Restore(int deepest, int current, int progress)
+        {
+            _deepest.Value = Math.Max(0, Math.Min(deepest, MaxDepth - 1));
+            _progress.Value = IsDeepestUnlocked ? 0 : Math.Max(0, Math.Min(progress, MeteorsPerDepth - 1));
+            _current.Value = Math.Max(0, Math.Min(current, Deepest));
+        }
+
+        /// <summary>Unlocks up to a depth without breaking meteors (debug tools).</summary>
         public void Unlock(int deepest, int current)
         {
             _progress.Value = 0;

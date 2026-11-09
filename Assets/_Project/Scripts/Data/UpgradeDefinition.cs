@@ -17,6 +17,8 @@ namespace VoidProspector.Data
         RefineSuccess,
         ScannerRange,
         OfflineCap,
+        /// <summary>Which meteor drones pick: 0 random, 1 nearest, 2 weakest, 3 richest (see DroneTargeting).</summary>
+        DroneTargeting,
     }
 
     [CreateAssetMenu(menuName = "Void Prospector/Upgrade", fileName = "Upgrade")]
@@ -33,6 +35,8 @@ namespace VoidProspector.Data
         public double perLevel = 1;
         [Tooltip("Level 0 means the feature is off (e.g. auto-fire); effects start counting from level 1")]
         public bool offAtLevelZero;
+        [Tooltip("Shown and buyable once the sector with this index is unlocked (1 = from the start)")]
+        [Min(1)] public int requiresSector = 1;
 
         [Header("Cost")]
         [Min(0)] public double baseCost = 10;

@@ -1,14 +1,16 @@
+using System;
 using R3;
 using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
 using VoidProspector.Core;
+using VoidProspector.Idle;
 
 namespace VoidProspector.UI
 {
     /// <summary>
-    /// Greybox HUD. Top bar: credits, sector and depth controls. Bottom panel: cargo bar, Sell, auto-sell
-    /// threshold and the upgrades list.
+    /// Greybox HUD. Top bar: credits, idle income per second, the sector (opens the Star Map) and depth controls.
+    /// Bottom panel: cargo bar, Sell, auto-sell threshold and the upgrades list.
     /// </summary>
     public class Hud : MonoBehaviour
     {
@@ -23,6 +25,10 @@ namespace VoidProspector.UI
         static readonly Color CargoColor = new Color(0.5f, 0.85f, 1f);
         static readonly Color CargoFullColor = new Color(1f, 0.45f, 0.4f);
         static readonly Color DepthColor = new Color(0.6f, 0.9f, 1f);
+        static readonly Color IdleColor = new Color(0.75f, 0.85f, 1f);
+        static readonly Color MapColor = new Color(0.22f, 0.24f, 0.32f);
+        static readonly Color MapReadyColor = new Color(0.65f, 0.5f, 0.15f);
+        static readonly Color JumpColor = new Color(1f, 0.8f, 0.4f);
 
         public RectTransform PopupLayer { get; private set; }
         public TextMeshProUGUI Toast { get; private set; }
@@ -30,8 +36,11 @@ namespace VoidProspector.UI
         GameRoot _root;
         GameSession Session => _root.Session;
 
-        TextMeshProUGUI _credits, _sector, _depth, _cargoText, _sellLabel, _autoSellLabel;
-        Button _sell, _shallower, _deeper;
+        TextMeshProUGUI _credits, _idle, _sector, _depth, _cargoText, _sellLabel, _autoSellLabel;
+        Button _sell, _shallower, _deeper, _map;
+        Image _mapImage;
+        StarMapPanel _starMap;
+        JumpState _jumpState;
         RectTransform _cargoFill, _depthFill;
         Image _cargoFillImage;
         UpgradePanel _upgrades;
@@ -74,10 +83,17 @@ namespace VoidProspector.UI
 
             _credits = UiFactory.Text(top, "Credits", "$ 0", 72, TextAlignmentOptions.Left, CreditsColor);
             _credits.fontStyle = FontStyles.Bold;
-            UiFactory.PlaceFromBottom(_credits.rectTransform, 0f, 0.5f, 0, TopBarHeight, 40);
+            UiFactory.PlaceFromBottom(_credits.rectTransform, 0f, 0.5f, 50, 120, 40);
 
-            _sector = UiFactory.Text(top, "Sector", "", 34, TextAlignmentOptions.Center, new Color(0.75f, 0.85f, 1f));
-            UiFactory.PlaceFromBottom(_sector.rectTransform, 0.5f, 1f, 140, 50, 30);
+            // Idle income: what auto-fire and drones earn per second with no input (offline earnings use the same number).
+            _idle = UiFactory.Text(top, "Idle Income", "", 30, TextAlignmentOptions.Left, IdleColor);
+            UiFactory.PlaceFromBottom(_idle.rectTransform, 0f, 0.5f, 18, 44, 40);
+
+            _starMap = gameObject.AddComponent<StarMapPanel>();
+            _starMap.Init(_root);
+            _map = UiFactory.Button(top, "Map", MapColor, _starMap.Open, out _sector, 30);
+            _mapImage = (Image)_map.targetGraphic;
+            UiFactory.PlaceFromBottom((RectTransform)_map.transform, 0.5f, 1f, 136, 56, 24);
 
             _shallower = UiFactory.Button(top, "Shallower", ToggleColor, () => Session.Depths.TrySetDepth(Session.Depth - 1), out var lessLabel, 44);
             lessLabel.text = "<";
@@ -141,6 +157,12 @@ namespace VoidProspector.UI
                 return;
             }
             var value = Session.SellCargo();
+            if (value <= GameNumber.Zero)
+            {
+                _root.Audio.Deny();
+                _root.Fx.Toast("Keeping these for the jump drive", JumpColor);
+                return;
+            }
             _root.Audio.Sell();
             _root.Fx.Toast($"+$ {NumberFormatter.Format(value)}", CreditsColor);
             _root.Fx.Burst(_root.Ship.position, new Color(1f, 0.85f, 0.3f), 30, 6f, 0.2f);
@@ -163,7 +185,18 @@ namespace VoidProspector.UI
             var cargo = Session.Cargo;
             var depths = Session.Depths;
 
-            _sector.text = $"{Session.Sector.index}. {Session.Sector.displayName}";
+            _sector.text = $"{Session.Sector.index}. {Session.Sector.displayName}  <size=24>MAP</size>";
+
+            BindJumpDrive();
+            BindIdleIncome();
+
+            Session.Milestones.Completed
+                .Subscribe(m =>
+                {
+                    _root.Fx.Toast($"Milestone: {m.Title}!\n<size=38>{m.RewardText}</size>", JumpColor);
+                    _root.Audio.Rare(2);
+                })
+                .AddTo(this);
 
             Session.Wallet.CreditsRx
                 .Subscribe(credits => _credits.text = "$ " + NumberFormatter.Format(credits))
@@ -177,7 +210,8 @@ namespace VoidProspector.UI
                 .Subscribe(_ => DrawCargo())
                 .AddTo(this);
 
-            Observable.Merge(cargo.CountRx.AsUnitObservable(), cargo.ValueRx.AsUnitObservable())
+            Observable.Merge(cargo.CountRx.AsUnitObservable(), cargo.ValueRx.AsUnitObservable(), depths.DeepestRx.AsUnitObservable(),
+                    Session.UnlockedSectorRx.AsUnitObservable())
                 .Subscribe(_ => DrawSell())
                 .AddTo(this);
 
@@ -186,6 +220,70 @@ namespace VoidProspector.UI
                     ? "Auto-sell\n<size=26>off</size>"
                     : $"Auto-sell\n<size=26>below {Session.Purity[below].name}</size>")
                 .AddTo(this);
+        }
+
+        /// <summary>
+        /// The map button turns gold when the jump drive can be bought; toasts announce when it becomes available
+        /// (minerals are kept from then on) and when it's affordable.
+        /// </summary>
+        void BindJumpDrive()
+        {
+            var cargo = Session.Cargo;
+            Observable.Merge(Session.Wallet.CreditsRx.AsUnitObservable(), cargo.CountRx.AsUnitObservable(),
+                    Session.Depths.DeepestRx.AsUnitObservable(), Session.UnlockedSectorRx.AsUnitObservable())
+                .Select(_ => Session.JumpState)
+                .DistinctUntilChanged()
+                .Subscribe(state => _mapImage.color = state == JumpState.Affordable ? MapReadyColor : MapColor)
+                .AddTo(this);
+
+            // Skip the state at startup so loading a save doesn't toast.
+            _jumpState = Session.JumpState;
+            Observable.Merge(Session.Wallet.CreditsRx.AsUnitObservable(), cargo.CountRx.AsUnitObservable(),
+                    Session.Depths.DeepestRx.AsUnitObservable(), Session.UnlockedSectorRx.AsUnitObservable())
+                .Select(_ => Session.JumpState)
+                .DistinctUntilChanged()
+                .Skip(1)
+                .Subscribe(OnJumpStateChanged)
+                .AddTo(this);
+        }
+
+        void OnJumpStateChanged(JumpState state)
+        {
+            var previous = _jumpState;
+            _jumpState = state;
+            var next = Session.NextSector;
+            if (next == null) return;
+            if (state == JumpState.Affordable)
+                _root.Fx.Toast("Jump drive ready! Open the MAP", JumpColor);
+            else if (state == JumpState.Saving && previous == JumpState.NeedsDepth)
+                _root.Fx.Toast($"Jump drive to {next.displayName} available: see the MAP", JumpColor);
+        }
+
+        /// <summary>
+        /// Re-estimates idle income (a short simulation, the same one offline earnings use) shortly after anything that
+        /// changes it: purchases, depth, milestones. Debounced so buying ×10 runs it once.
+        /// </summary>
+        void BindIdleIncome()
+        {
+            Observable.Merge(
+                    Session.Upgrades.Bought.AsUnitObservable(),
+                    Session.Depths.CurrentRx.AsUnitObservable(),
+                    Session.Milestones.Completed.AsUnitObservable())
+                .Debounce(TimeSpan.FromSeconds(0.3), UnityTimeProvider.UpdateIgnoreTimeScale)
+                .Prepend(Unit.Default)
+                .Subscribe(_ => DrawIdleIncome())
+                .AddTo(this);
+        }
+
+        void DrawIdleIncome()
+        {
+            if (!Session.HasIdleMining)
+            {
+                _idle.text = "Idle: buy Auto-fire";
+                return;
+            }
+            double rate = OfflineEarnings.EstimateIncomePerSecond(Session, Session.Database.offline.incomeSampleSeconds);
+            _idle.text = $"Idle  $ {NumberFormatter.Format(rate)}/s";
         }
 
         void DrawDepth()
@@ -208,7 +306,9 @@ namespace VoidProspector.UI
         void DrawSell()
         {
             var cargo = Session.Cargo;
-            _sellLabel.text = cargo.IsEmpty ? "SELL" : $"SELL  $ {NumberFormatter.Format(cargo.Value)}";
+            var reserve = Session.JumpReserve;
+            string keep = reserve.Count > 0 ? $"\n<size=24>keeps {reserve[0].count} {reserve[0].mineral.displayName} for the jump drive</size>" : "";
+            _sellLabel.text = cargo.IsEmpty ? "SELL" : $"SELL  $ {NumberFormatter.Format(Session.SellableValue)}{keep}";
             _sell.interactable = !cargo.IsEmpty;
         }
     }

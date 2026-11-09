@@ -49,6 +49,13 @@ namespace VoidProspector.Data
         [Tooltip("Purity grade index at and above which a toast and sting play")]
         [Min(0)] public int rareGrade = 3;
 
+        [Header("Drones (look only; balance is in GameDatabase.drones and the upgrades)")]
+        [Tooltip("Distance of the drone orbit from the ship (world units)")]
+        [Min(0.5f)] public float droneOrbitRadius = 1.4f;
+        [Tooltip("Degrees per second")]
+        public float droneOrbitSpeed = 50f;
+        [Min(0.05f)] public float droneSize = 0.28f;
+
         [Header("Juice")]
         [Min(0)] public float hitShake = 0.05f;
         [Tooltip("Multiplied by the meteor radius")]

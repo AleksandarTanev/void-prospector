@@ -31,5 +31,8 @@ namespace VoidProspector.Economy
             _credits.Value = Credits - amount;
             return true;
         }
+
+        /// <summary>Sets the credits directly when loading a save.</summary>
+        public void Restore(GameNumber credits) => _credits.Value = credits < GameNumber.Zero ? GameNumber.Zero : credits;
     }
 }

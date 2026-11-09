@@ -36,12 +36,12 @@ namespace VoidProspector.Mining
             };
         }
 
-        /// <summary>Rolls a purity grade for a mineral and works out its value.</summary>
+        /// <summary>Rolls a purity grade for a mineral and works out its value. <paramref name="valueMultiplier"/> carries permanent bonuses (milestones).</summary>
         public static ChunkData RollChunk(MineralDefinition mineral, PurityTable purity, SectorDefinition sector,
-            int depth, bool fromCore, Random rng)
+            int depth, bool fromCore, Random rng, double valueMultiplier = 1)
         {
             int grade = purity.Roll(rng, fromCore ? 1 : 0);
-            var value = Formulas.ChunkValue(mineral.BaseValue, purity[grade].valueMultiplier, depth, sector.depthValueStep);
+            var value = Formulas.ChunkValue(mineral.BaseValue, purity[grade].valueMultiplier, depth, sector.depthValueStep, valueMultiplier);
             return new ChunkData(mineral, grade, value);
         }
     }

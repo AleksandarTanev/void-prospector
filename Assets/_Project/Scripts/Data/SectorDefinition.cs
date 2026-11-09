@@ -32,8 +32,10 @@ namespace VoidProspector.Data
         public MeteorTypeWeight[] meteorTypes = Array.Empty<MeteorTypeWeight>();
         [Tooltip("The mineral the jump drive to the next sector is paid with")]
         public MineralDefinition signatureMineral;
-        [Tooltip("Cost to unlock this sector; empty for the starting sector")]
+        [Tooltip("Jump drive cost to unlock this sector (credits and/or minerals from the cargo hold); empty for the starting sector")]
         public ResourceCost[] unlockCost = Array.Empty<ResourceCost>();
+        [Tooltip("Background colour (each sector has its own palette)")]
+        public Color backgroundColor = new Color(0.03f, 0.04f, 0.09f);
 
         [Header("Depth scaling")]
         [Tooltip("HP is multiplied by this per depth level")]
@@ -45,6 +47,18 @@ namespace VoidProspector.Data
         {
             var pick = WeightedRandom.Pick(meteorTypes, t => t.type != null ? t.weight : 0f, rng);
             return pick?.type;
+        }
+
+        /// <summary>The credit part of <see cref="unlockCost"/>.</summary>
+        public GameNumber UnlockCredits
+        {
+            get
+            {
+                var total = GameNumber.Zero;
+                foreach (var c in unlockCost)
+                    if (c != null && c.mineral == null) total += c.amount;
+                return total;
+            }
         }
 
         public GameNumber MeteorHp(MeteorSizeDefinition size, MeteorTypeDefinition type, int depth) =>

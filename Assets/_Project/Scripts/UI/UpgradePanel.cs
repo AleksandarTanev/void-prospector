@@ -6,11 +6,15 @@ using UnityEngine;
 using UnityEngine.UI;
 using VoidProspector.Core;
 using VoidProspector.Data;
+using VoidProspector.Drones;
 using VoidProspector.Economy;
 
 namespace VoidProspector.UI
 {
-    /// <summary>Scrolling list of upgrade tracks with a ×1 / ×10 / MAX buy-mode toggle.</summary>
+    /// <summary>
+    /// Scrolling list of upgrade tracks with a ×1 / ×10 / MAX buy-mode toggle. Tracks tied to a later sector
+    /// (drones) appear once that sector is unlocked.
+    /// </summary>
     public class UpgradePanel : MonoBehaviour
     {
         const float HeaderHeight = 64f;
@@ -24,6 +28,7 @@ namespace VoidProspector.UI
         class Row
         {
             public UpgradeTrack track;
+            public GameObject root;
             public TextMeshProUGUI info;
             public Button buy;
             public TextMeshProUGUI buyLabel;
@@ -106,7 +111,7 @@ namespace VoidProspector.UI
             info.rectTransform.offsetMin = new Vector2(24, 0);
             info.rectTransform.offsetMax = Vector2.zero;
 
-            var row = new Row { track = track, info = info };
+            var row = new Row { track = track, root = bg.gameObject, info = info };
             row.buy = UiFactory.Button(rt, "Buy", BuyColor, () => OnBuy(row), out row.buyLabel, 34);
             var brt = (RectTransform)row.buy.transform;
             brt.anchorMin = new Vector2(0.62f, 0);
@@ -124,7 +129,7 @@ namespace VoidProspector.UI
 
         void OnBuy(Row row)
         {
-            int bought = Session.Upgrades.TryBuy(row.track, _mode.Value);
+            int bought = Session.TryBuy(row.track, _mode.Value);
             if (bought == 0)
             {
                 _root.Audio.Deny();
@@ -150,6 +155,7 @@ namespace VoidProspector.UI
                 var r = row;
                 var t = r.track;
                 t.LevelRx.Subscribe(_ => DrawInfo(r)).AddTo(this);
+                Session.UnlockedSectorRx.Subscribe(_ => r.root.SetActive(Session.IsAvailable(t))).AddTo(this);
 
                 Observable.CombineLatest(t.LevelRx, credits, _mode, (_, c, m) => t.Quote(m, c))
                     .DistinctUntilChangedBy(q => (q.count, q.cost, q.affordable))
@@ -188,6 +194,9 @@ namespace VoidProspector.UI
                 case UpgradeEffect.CritChance: return (v * 100).ToString("0", c) + "%";
                 case UpgradeEffect.CollectorRadius: return v.ToString("0.0", c) + "m";
                 case UpgradeEffect.CargoCapacity: return NumberFormatter.Format(v);
+                case UpgradeEffect.DroneCount: return ((int)v).ToString(c) + ((int)v == 1 ? " drone" : " drones");
+                case UpgradeEffect.DroneDamage: return (v * 100).ToString("0", c) + "% of drill";
+                case UpgradeEffect.DroneTargeting: return DroneTargeting.Describe(DroneTargeting.RuleForLevel(v));
                 default: return v.ToString("0.##", c);
             }
         }

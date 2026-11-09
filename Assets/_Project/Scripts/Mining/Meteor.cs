@@ -15,6 +15,16 @@ namespace VoidProspector.Mining
         public float Radius { get; private set; }
         public bool Active { get; private set; }
         public MeteorState State { get; private set; }
+        /// <summary>Sum of the base values of the minerals still inside (drones' "richest" targeting).</summary>
+        public double ContentValue
+        {
+            get
+            {
+                double v = 0;
+                for (int i = _nextChunk; i < _spawn.minerals.Length; i++) v += _spawn.minerals[i].baseValue;
+                return v;
+            }
+        }
 
         MeteorField _field;
         SpriteRenderer _body;
@@ -60,8 +70,10 @@ namespace VoidProspector.Mining
             transform.rotation = Quaternion.Euler(0, 0, Random.Range(0f, 360f));
             transform.localScale = Vector3.one * Radius * 2f;
 
-            float shade = Random.Range(0.32f, 0.45f);
-            _baseColor = _color = new Color(shade + 0.03f, shade, shade - 0.02f);
+            // The type's colour with a little per-meteor variation, so Metallic and Stony meteors read differently.
+            float shade = Random.Range(0.85f, 1.15f);
+            var tint = spawn.type.bodyColor;
+            _baseColor = _color = new Color(tint.r * shade, tint.g * shade, tint.b * shade);
             _body.color = _color;
 
             foreach (var c in _cracks) c.gameObject.SetActive(false);
@@ -114,7 +126,7 @@ namespace VoidProspector.Mining
             if (_field.IsOutside(this)) _field.Release(this);
         }
 
-        public void Hit(HitRoll roll, bool fromTap)
+        public void Hit(HitRoll roll, bool fromTap, bool quiet = false)
         {
             if (!Active) return;
             var result = State.Hit(roll.damage);
@@ -126,7 +138,7 @@ namespace VoidProspector.Mining
             fx.Number(pos + (Vector3)(Random.insideUnitCircle * Radius * 0.4f), roll.damage, fromTap, roll.crit);
             fx.Burst(pos, Color.Lerp(_color, Color.white, 0.4f), fromTap ? 6 : 2, 3f, 0.12f);
             if (fromTap) fx.Shake(S.hitShake);
-            Root.Audio.Hit(fromTap);
+            if (!quiet) Root.Audio.Hit(fromTap);
 
             if (result.cracks > 0) Crack(result);
             if (result.broke) Break(result);

@@ -18,6 +18,8 @@ namespace VoidProspector.Data
         public string id;
         public string displayName;
         [Min(0)] public float hpMultiplier = 1;
+        [Tooltip("Body colour, so types are easy to tell apart (greybox)")]
+        public Color bodyColor = new Color(0.4f, 0.38f, 0.36f);
         public MineralWeight[] composition = Array.Empty<MineralWeight>();
 
         public MineralDefinition RollMineral(System.Random rng)

@@ -1,0 +1,27 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: d8115b6353200354b80887f2d8126c88, type: 3}
+  m_Name: DroneCount
+  m_EditorClassIdentifier: VoidProspector::VoidProspector.Data.UpgradeDefinition
+  id: drone_count
+  displayName: Drones
+  description: Mining drones orbit the ship and shoot meteors on their own, even while you are away.
+  effect: 5
+  mode: 0
+  baseValue: 0
+  perLevel: 1
+  offAtLevelZero: 0
+  requiresSector: 2
+  baseCost: 2500
+  growth: 2.2
+  maxLevel: 6
+  costMineral: {fileID: 0}

@@ -17,7 +17,7 @@ How to build the game described in the Game Design Document (GDD), step by step.
 | Input | New Input System only |
 | Packages | Input System 1.20, uGUI 2.6 (includes TextMeshPro), Test Framework 1.8, URP 17.6 |
 | Prototype | Built in `Assets/Prototype/` (Phase 1, steps 1–9); see [PROTOTYPE_PLAN.md](PROTOTYPE_PLAN.md) |
-| Real game | Phases 2–3 done; Phase 4 (upgrades and economy) built in `Assets/_Project/`, scene `Assets/_Project/Scenes/Game.unity` |
+| Real game | Phases 2–5 done; Phase 6 (Sector 2, drones, milestones) built in `Assets/_Project/`, scene `Assets/_Project/Scenes/Game.unity` |
 
 Work through the phases in order. Each phase ends with a **Done when** check. Don't start the next phase until it passes. The early phases are deliberately ugly: they prove that the game is fun before any art is made. Phase 1 is a quick, throwaway gameplay prototype; the real game is built from Phase 2 onward.
 
@@ -212,12 +212,26 @@ To redo the spreadsheet after changing data: Unity menu **Void Prospector → Ex
 
 Do this early. Mobile operating systems kill apps without warning, and saving gets harder to add the more systems exist.
 
-- [ ] `SaveData` class (plain C#), serialised to JSON in `Application.persistentDataPath`
-- [ ] Save on: app pause or focus loss, every 30 seconds, after purchases
-- [ ] Write to a temp file, then rename it (so a crash mid-save can't corrupt the save)
-- [ ] Save version number, for migrating old saves later
-- [ ] **Offline earnings:** on return, estimate income per second × time away, capped at 8 hours; show a "Welcome back" popup
-- [ ] Clock-cheat guard: if the saved time is in the future, ignore the time away
+- [x] `SaveData` class (plain C#), serialised to JSON in `Application.persistentDataPath`
+- [x] Save on: app pause or focus loss, every 30 seconds, after purchases
+- [x] Write to a temp file, then rename it (so a crash mid-save can't corrupt the save)
+- [x] Save version number, for migrating old saves later
+- [x] **Offline earnings:** on return, estimate income per second × time away, capped at 8 hours; show a "Welcome back" popup
+- [x] Clock-cheat guard: if the saved time is in the future, ignore the time away
+- [ ] Kill the app at random moments (editor and phone), reopen, check nothing is lost; check the offline numbers feel right
+
+How it works:
+- `Core/SaveData` (fields only, content by id) ⇄ `SaveSystem.Capture/Apply` ⇄ JSON. Unknown ids are skipped and out-of-range levels or depths clamped, with warnings, so data changes don't break old saves. `SaveSystem.CurrentVersion` = 1; `Migrate` is where format changes go.
+- `SaveStore` writes `save.json.tmp` (flushed to disk), moves the old save to `save.json.bak`, then moves the temp file into place. Loading tries the save, then the backup.
+- `SaveController` saves every 30 s (real time), after purchases, depth unlocks and auto-sell changes, and on pause, focus loss, quit and scene unload.
+- `Idle/OfflineEarnings`: income per second is estimated by running `EconomySimulator` on a copy of the session for 10 minutes with no taps and no purchases (auto-fire only, at the current depth). Paid = rate × min(away, cap) × efficiency. Nothing below 60 s away; nothing if the auto-fire upgrade isn't bought (a toast says to buy it). Settings in `GameDatabase.offline` (cap 8 h, min 60 s, efficiency 1, sample 600 s).
+- `OfflineController` pays when the game starts from a save and when the app resumes from the background. Credits go into the wallet and are saved immediately; the popup only reports them.
+- Debug panel: "Away 1h", "Away 10h" (save as if written that long ago, then restart) and "Wipe save". "Restart" keeps the save.
+
+Open questions:
+- Offline efficiency: the GDD doesn't say. Currently 100% of the idle (auto-fire only) rate. Many idle games pay less while away; decide after playtesting.
+- Rewarded "double offline earnings" (Phase 12) will need a Collect choice before the credits are added, and storing pending earnings in the save.
+- Offline income ignores the cargo hold filling up (as if auto-sell were on). Fine for now; revisit with drones in Phase 6.
 
 **Done when:** you can kill the app at any moment, reopen it and lose nothing, and offline earnings look right.
 
@@ -225,12 +239,32 @@ Do this early. Mobile operating systems kill apps without warning, and saving ge
 
 ## Phase 6 — Sector 2 and drones (the idle engine)
 
-- [ ] Data: Iron, Nickel; Metallic meteor type; Sector 2 definition
-- [ ] **Jump drive:** an upgrade that unlocks the next sector, paid with the current sector's signature mineral
-- [ ] Sector select: travel between unlocked sectors and depths
-- [ ] **Drones:** orbit the ship, pick targets and deal damage; upgrades for count, damage and targeting
-- [ ] Income-per-second readout (used for offline earnings too)
-- [ ] Milestones: "Mine 1,000 Iron" style one-off rewards
+- [x] Data: Iron, Nickel; Metallic meteor type; Sector 2 definition
+- [x] **Jump drive:** an upgrade that unlocks the next sector, paid with the current sector's signature mineral
+- [x] Sector select: travel between unlocked sectors and depths
+- [x] **Drones:** orbit the ship, pick targets and deal damage; upgrades for count, damage and targeting
+- [x] Income-per-second readout (used for offline earnings too)
+- [x] Milestones: "Mine 1,000 Iron" style one-off rewards
+- [x] EditMode tests (149 in total), including "reaching Sector 2 takes 7–14 minutes" and "idle with drones keeps buying" simulator checks
+- [ ] Play it: reach the Iron Belt, buy drones, leave it alone for a few minutes; check the numbers feel right
+
+How it works:
+- **Sector 2, Iron Belt** (`Data/Sectors/IronBelt.asset`): base HP 40, Stony 35 / Metallic 65. **Metallic** meteors: HP ×1.5, Rock 25 / Iron 45 / Nickel 25 / Copper 5, reddish body. **Nickel**: tier 2, value 30. Each sector has its own background colour; each meteor type its own body colour.
+- **Jump drive** = the next sector's `unlockCost`: Iron Belt costs **$5,000 + 40 Copper** from the cargo hold. It becomes available once the **last depth** of the furthest sector is unlocked. From then on, Sell and auto-sell **keep the cheapest Copper chunks** needed for it (the Sell button says so), and payment takes the cheapest chunks. The map button turns gold and a toast says when it's affordable.
+- **Star Map** (tap the sector name in the top bar): each sector shows "here", **Travel**, **Buy jump drive** with the cost (green when you have it), or Locked; plus the milestone list with progress. Travelling saves and reloads the scene in the new sector. Each sector keeps its own depth progress; cargo, credits and upgrades go with the ship.
+- **Drones** (shown and buyable once Sector 2 is unlocked: `UpgradeDefinition.requiresSector`): up to 6 orbit the ship. Each shoots every 0.8 s (`GameDatabase.drones.fireInterval`) for drill damage × Drone Damage (100% +25% per level), and can crit. **Drone Targeting** levels: random → nearest → weakest (finishes meteors) → richest (most valuable contents). Timers are pure (`Drones/DroneBay`) and live in the session, so the simulator and offline earnings include drones; the view (`DroneSwarm`) picks targets and draws beams.
+- **Idle income readout** under the credits: the same estimate offline earnings use (simulate 10 min with no taps and no purchases), recalculated 0.3 s after purchases, depth changes and milestones.
+- **Milestones** (`Data/Milestones/`, `Progression/Milestones`): Mine 200 Copper, Mine 150 Tin, Break 150 meteors in the Debris Ring, Reach depth 10 in the Debris Ring, Mine 1,000 Iron, Mine 500 Nickel, Reach depth 10 in the Iron Belt. Rewards: credits once and a permanent value bonus (one mineral or all), applied in `Formulas.ChunkValue` through the codex-bonus factor. Lifetime counters and completed milestones are saved.
+- **Save version 2**: depth per sector, furthest unlocked sector, milestones and counters, value per cargo stack. Version 1 saves are migrated (the old depth becomes the current sector's).
+- **Simulator**: drones fire (they don't wait for the tap player's retarget delay), and once the jump drive is available the player stops buying upgrades, saves for it, buys it and travels. The jump time is in `Result.jumps`.
+- Debug panel: **Unlock sector** unlocks the next sector without paying.
+
+Open questions:
+- Tuning not checked yet: the simulator test expects the jump at 7–14 minutes (estimate: about 9–10). If it fails, change the Iron Belt's credit cost first.
+- The GDD says drone upgrades are paid with Titanium and Nickel. Titanium only appears in Sector 4, so drones cost credits for now; Nickel costs could come with the refinery, using the same "keep in the hold" rule as the jump drive.
+- Keeping Copper for the jump drive changes what Sell does. Watch whether players understand it; an alternative is a separate mineral stock.
+- Drone shots don't play a sound (it would be constant); give drones their own quiet sound in Phase 9.
+- Drone targeting only matters on screen: the simulator has one meteor at a time, so offline earnings ignore it.
 
 **Done when:** you can leave the game running with no input and progress steadily; reaching Sector 2 takes about 10 minutes.
 

@@ -15,6 +15,7 @@ MonoBehaviour:
   id: stony
   displayName: Stony
   hpMultiplier: 1
+  bodyColor: {r: 0.41, g: 0.385, b: 0.365, a: 1}
   composition:
   - mineral: {fileID: 11400000, guid: 03b286707edf3f74c98f0b7854e57f24, type: 2}
     weight: 65

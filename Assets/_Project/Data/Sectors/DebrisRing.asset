@@ -22,5 +22,6 @@ MonoBehaviour:
     weight: 1
   signatureMineral: {fileID: 11400000, guid: 79e76ec4d8c1fa0469a6305d64e0dd50, type: 2}
   unlockCost: []
+  backgroundColor: {r: 0.03, g: 0.04, b: 0.09, a: 1}
   depthHpGrowth: 1.18
   depthValueStep: 0.15
