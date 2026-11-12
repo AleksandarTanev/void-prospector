@@ -16,15 +16,23 @@ namespace VoidProspector.Mining
         public Color Tint { get; private set; }
 
         SpriteRenderer _sr, _glow;
+        MeshRenderer _gem;
+        Vector3 _spinAxis;
+        float _scale;
         Vector2 _vel;
         float _age, _glowAlpha, _fade;
         bool _magnet, _rejected;
 
-        public void Build()
+        /// <param name="lowPoly">A spinning gem mesh instead of the circle sprite (the glow stays a sprite).</param>
+        public void Build(bool lowPoly = false)
         {
-            _sr = gameObject.AddComponent<SpriteRenderer>();
-            _sr.sprite = ShapeSprites.Circle;
-            _sr.sortingOrder = 6;
+            if (lowPoly) _gem = LowPolyMeshes.NewRenderer("Gem", LowPolyMeshes.Gem, transform);
+            else
+            {
+                _sr = gameObject.AddComponent<SpriteRenderer>();
+                _sr.sprite = ShapeSprites.Circle;
+                _sr.sortingOrder = 6;
+            }
             _glow = ShapeSprites.NewRenderer("Glow", ShapeSprites.Glow, transform, 5);
             _glow.transform.localScale = Vector3.one * GlowScale;
         }
@@ -42,14 +50,23 @@ namespace VoidProspector.Mining
             if (data.grade > 1) c = Color.Lerp(c, Color.white, 0.12f * (data.grade - 1));
             c.a = 1;
             Tint = c;
-            _sr.color = c;
+            if (_gem != null)
+            {
+                // A little self-glow so dark minerals still read; more for higher grades.
+                LowPolyMeshes.SetColor(_gem, c, 0.3f + 0.1f * data.grade);
+                _gem.transform.localRotation = Random.rotationUniform;
+                _spinAxis = Random.onUnitSphere;
+            }
+            else _sr.color = c;
 
             _glowAlpha = Mathf.Clamp01(grade.glow * 0.7f);
             _glow.enabled = grade.glow > 0;
             _glow.color = new Color(c.r, c.g, c.b, _glowAlpha);
 
             transform.position = pos;
-            transform.localScale = Vector3.one * (0.2f + 0.03f * data.grade);
+            _scale = 0.2f + 0.03f * data.grade;
+            if (_gem != null) _scale *= 1.7f;   // a gem covers much less than a full circle
+            transform.localScale = Vector3.one * _scale;
             gameObject.SetActive(true);
         }
 
@@ -87,7 +104,13 @@ namespace VoidProspector.Mining
             transform.position = p;
 
             float a = Mathf.Clamp01(_fade);
-            _sr.color = new Color(Tint.r, Tint.g, Tint.b, a);
+            if (_gem != null)
+            {
+                // Opaque mesh: fading shrinks it instead.
+                _gem.transform.Rotate(_spinAxis, 200f * dt, Space.World);
+                transform.localScale = Vector3.one * (_scale * a);
+            }
+            else _sr.color = new Color(Tint.r, Tint.g, Tint.b, a);
             if (_glow.enabled)
             {
                 _glow.transform.localScale = Vector3.one * GlowScale * (1f + 0.15f * Mathf.Sin(_age * 8f));

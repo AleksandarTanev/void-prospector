@@ -36,7 +36,7 @@ namespace VoidProspector.Mining
             var go = new GameObject("Chunk");
             go.transform.SetParent(_container, false);
             var c = go.AddComponent<Chunk>();
-            c.Build();
+            c.Build(_root.LowPoly);
             return c;
         }
 

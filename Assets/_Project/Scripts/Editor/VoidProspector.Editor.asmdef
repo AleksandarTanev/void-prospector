@@ -2,7 +2,9 @@
     "name": "VoidProspector.Editor",
     "rootNamespace": "VoidProspector.EditorTools",
     "references": [
-        "VoidProspector"
+        "VoidProspector",
+        "Unity.RenderPipelines.Core.Runtime",
+        "Unity.RenderPipelines.Universal.Runtime"
     ],
     "includePlatforms": [
         "Editor"

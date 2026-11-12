@@ -6,7 +6,10 @@ using VoidProspector.Fx;
 
 namespace VoidProspector.Mining
 {
-    /// <summary>A drifting meteor: visuals, movement and hit reactions. HP and chunk logic live in <see cref="MeteorState"/>.</summary>
+    /// <summary>
+    /// A drifting meteor: visuals, movement and hit reactions. HP and chunk logic live in <see cref="MeteorState"/>.
+    /// With <see cref="GameRoot.LowPoly"/> the body is a tumbling flat-shaded rock with mineral shards; otherwise sprites.
+    /// </summary>
     public class Meteor : MonoBehaviour
     {
         const int MaxVeins = 3;
@@ -31,6 +34,10 @@ namespace VoidProspector.Mining
 
         MeteorField _field;
         SpriteRenderer _body;
+        MeshRenderer _rock;
+        readonly List<MeshRenderer> _shards = new List<MeshRenderer>();
+        Vector3 _tumbleAxis;
+        bool _lowPoly;
         readonly List<SpriteRenderer> _cracks = new List<SpriteRenderer>();
         readonly List<SpriteRenderer> _veins = new List<SpriteRenderer>();
 
@@ -46,6 +53,19 @@ namespace VoidProspector.Mining
         public void Build(MeteorField field)
         {
             _field = field;
+            _lowPoly = Root.LowPoly;
+            if (_lowPoly)
+            {
+                _rock = LowPolyMeshes.NewRenderer("Rock", LowPolyMeshes.Rock(0), transform);
+                for (int i = 0; i < MaxVeins; i++)
+                {
+                    var shard = LowPolyMeshes.NewRenderer("Shard", LowPolyMeshes.Gem, _rock.transform);
+                    shard.gameObject.SetActive(false);
+                    _shards.Add(shard);
+                }
+                return;
+            }
+
             _body = gameObject.AddComponent<SpriteRenderer>();
             _body.sprite = ShapeSprites.Circle;
             _body.sortingOrder = 0;
@@ -70,14 +90,22 @@ namespace VoidProspector.Mining
             _flash = _punch = 0;
 
             transform.position = pos;
-            transform.rotation = Quaternion.Euler(0, 0, Random.Range(0f, 360f));
             transform.localScale = Vector3.one * Radius * 2f;
+            if (_lowPoly)
+            {
+                transform.rotation = Quaternion.identity;
+                _rock.GetComponent<MeshFilter>().sharedMesh = LowPolyMeshes.Rock(Random.Range(0, LowPolyMeshes.RockVariants));
+                _rock.transform.localRotation = Random.rotationUniform;
+                _tumbleAxis = Random.onUnitSphere;
+                _spin *= 1.4f;
+            }
+            else transform.rotation = Quaternion.Euler(0, 0, Random.Range(0f, 360f));
 
             // The type's colour with a little per-meteor variation, so Metallic and Stony meteors read differently.
             float shade = Random.Range(0.85f, 1.15f);
             var tint = spawn.type.bodyColor;
             _baseColor = _color = new Color(tint.r * shade, tint.g * shade, tint.b * shade);
-            _body.color = _color;
+            SetBodyColor(_color);
 
             foreach (var c in _cracks) c.gameObject.SetActive(false);
             ShowVeins();
@@ -86,9 +114,16 @@ namespace VoidProspector.Mining
             gameObject.SetActive(true);
         }
 
-        /// <summary>Coloured dots hint at the valuable minerals inside (anything above tier 0).</summary>
+        void SetBodyColor(Color c)
+        {
+            if (_lowPoly) LowPolyMeshes.SetColor(_rock, c);
+            else _body.color = c;
+        }
+
+        /// <summary>Coloured dots (shards when low-poly) hint at the valuable minerals inside (anything above tier 0).</summary>
         void ShowVeins()
         {
+            if (_lowPoly) { ShowShards(); return; }
             int shown = 0;
             var seen = new HashSet<MineralDefinition>();
             foreach (var m in _spawn.minerals)
@@ -102,6 +137,28 @@ namespace VoidProspector.Mining
                 vein.gameObject.SetActive(true);
             }
             for (int i = shown; i < _veins.Count; i++) _veins[i].gameObject.SetActive(false);
+        }
+
+        void ShowShards()
+        {
+            int shown = 0;
+            var seen = new HashSet<MineralDefinition>();
+            foreach (var m in _spawn.minerals)
+            {
+                if (shown >= _shards.Count) break;
+                if (m.tier == 0 || !seen.Add(m)) continue;
+                var shard = _shards[shown++];
+                LowPolyMeshes.SetColor(shard, m.color, 0.35f);
+                // Half buried in the surface, pointing outward.
+                Vector3 dir = Random.onUnitSphere;
+                var t = shard.transform;
+                t.localPosition = dir * 0.4f;
+                t.localRotation = Quaternion.FromToRotation(Vector3.up, dir) * Quaternion.Euler(0, Random.Range(0f, 90f), 0);
+                float s = Random.Range(0.22f, 0.32f);
+                t.localScale = new Vector3(s * 0.8f, s * 1.3f, s * 0.8f);
+                shard.gameObject.SetActive(true);
+            }
+            for (int i = shown; i < _shards.Count; i++) _shards[i].gameObject.SetActive(false);
         }
 
         public void Deactivate() => Active = false;
@@ -118,13 +175,14 @@ namespace VoidProspector.Mining
                 _vel.y = -_vel.y;
 
             transform.position = p;
-            transform.Rotate(0, 0, _spin * dt);
+            if (_lowPoly) _rock.transform.Rotate(_tumbleAxis, _spin * dt, Space.World);
+            else transform.Rotate(0, 0, _spin * dt);
 
             _punch = Mathf.MoveTowards(_punch, 0, dt * 1.2f);
             transform.localScale = Vector3.one * Radius * 2f * (1f + _punch);
 
             if (_flash > 0) _flash -= dt;
-            _body.color = Color.Lerp(_color, Color.white, Mathf.Clamp01(_flash / 0.08f) * 0.8f);
+            SetBodyColor(Color.Lerp(_color, Color.white, Mathf.Clamp01(_flash / 0.08f) * 0.8f));
 
             if (_field.IsOutside(this)) _field.Release(this);
         }
@@ -171,7 +229,8 @@ namespace VoidProspector.Mining
                 line.color = new Color(0f, 0f, 0f, 0.6f);
                 _cracks.Add(line);
             }
-            line.transform.localPosition = Random.insideUnitCircle * 0.15f;
+            // In front of the rock when low-poly (the crack lines don't tumble with it).
+            line.transform.localPosition = (Vector3)(Random.insideUnitCircle * 0.15f) + (_lowPoly ? new Vector3(0, 0, -0.52f) : Vector3.zero);
             line.transform.localRotation = Quaternion.Euler(0, 0, Random.Range(0f, 180f));
             line.transform.localScale = new Vector3(0.05f, Random.Range(0.45f, 0.7f), 1);
             line.gameObject.SetActive(true);

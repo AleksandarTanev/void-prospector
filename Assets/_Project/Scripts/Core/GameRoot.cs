@@ -2,6 +2,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using UnityEngine;
+using UnityEngine.Rendering.Universal;
 using VoidProspector.Analytics;
 using VoidProspector.Data;
 using VoidProspector.Drones;
@@ -35,10 +36,23 @@ namespace VoidProspector.Core
         [SerializeField] Color background = new Color(0.03f, 0.04f, 0.09f);
         [SerializeField] Color shipColor = new Color(0.55f, 0.85f, 1f);
 
+        [Header("Low-poly experiment")]
+        [Tooltip("Meteors and chunks as flat-shaded 3D meshes (Universal renderer). Off = the 2D sprite look.")]
+        [SerializeField] bool lowPoly = true;
+        [Tooltip("Degrees the orthographic camera tilts up from looking straight at the play plane (low-poly only)")]
+        [Range(0f, 30f)] [SerializeField] float cameraTilt = 12f;
+        [Tooltip("Index of the Universal (3D) renderer in the URP asset (added by Void Prospector → Low-poly Setup)")]
+        [SerializeField] int lowPolyRendererIndex = 1;
+        [SerializeField] Color lightColor = new Color(1f, 0.95f, 0.85f);
+        [SerializeField] Color ambientColor = new Color(0.42f, 0.45f, 0.58f);
+
         public GameSession Session { get; private set; }
         public Camera Cam { get; private set; }
         public Transform Ship { get; private set; }
-        public float HalfH => Cam.orthographicSize;
+        public bool LowPoly => lowPoly;
+        float Tilt => lowPoly ? cameraTilt : 0f;
+        /// <summary>Half the visible height of the play plane (z = 0); taller than the camera's size when it tilts.</summary>
+        public float HalfH => Cam.orthographicSize / Mathf.Cos(Tilt * Mathf.Deg2Rad);
         public float HalfW => Cam.orthographicSize * Cam.aspect;
 
         public GameAudio Audio { get; private set; }
@@ -72,6 +86,7 @@ namespace VoidProspector.Core
             }
 
             SetupCamera();
+            if (lowPoly) SetupLight();
             CreateStarfield();
             var shipRenderer = CreateShip();
             var particleMaterial = new Material(shipRenderer.sharedMaterial) { name = "FX Particles", mainTexture = ShapeSprites.Circle.texture };
@@ -151,8 +166,38 @@ namespace VoidProspector.Core
             Cam.clearFlags = CameraClearFlags.SolidColor;
             var sectorColor = Session.Sector.backgroundColor;
             Cam.backgroundColor = sectorColor.a > 0 ? sectorColor : background;
-            Cam.transform.position = new Vector3(0, 0, -10);
+            // Tilted up around X; the view centre stays on the play plane's origin.
+            var rot = Quaternion.Euler(-Tilt, 0, 0);
+            Cam.transform.rotation = rot;
+            Cam.transform.position = rot * new Vector3(0, 0, -10);
+            Cam.nearClipPlane = 0.3f;
+            Cam.farClipPlane = 40f;
+            var data = Cam.GetUniversalAdditionalCameraData();
+            if (lowPoly) data.SetRenderer(lowPolyRendererIndex);
+            else data.SetRenderer(0);
             if (FindAnyObjectByType<AudioListener>() == null) Cam.gameObject.AddComponent<AudioListener>();
+        }
+
+        /// <summary>Screen point to the play plane (z = 0), correct for a tilted camera.</summary>
+        public Vector2 ScreenToPlane(Vector2 screen)
+        {
+            var ray = Cam.ScreenPointToRay(new Vector3(screen.x, screen.y, 0));
+            if (Mathf.Abs(ray.direction.z) < 1e-5f) return ray.origin;
+            float t = -ray.origin.z / ray.direction.z;
+            return ray.origin + ray.direction * t;
+        }
+
+        void SetupLight()
+        {
+            var light = new GameObject("Key Light").AddComponent<Light>();
+            light.type = LightType.Directional;
+            light.color = lightColor;
+            light.intensity = 1.25f;
+            light.shadows = LightShadows.None;
+            // From the upper left, a little in front of the play plane.
+            light.transform.rotation = Quaternion.LookRotation(new Vector3(0.55f, -0.6f, 0.6f));
+            RenderSettings.ambientMode = UnityEngine.Rendering.AmbientMode.Flat;
+            RenderSettings.ambientLight = ambientColor;
         }
 
         void CreateStarfield()
@@ -163,7 +208,7 @@ namespace VoidProspector.Core
             for (int i = 0; i < 80; i++)
             {
                 var star = ShapeSprites.NewRenderer("Star", ShapeSprites.Circle, root, -100);
-                star.transform.position = new Vector3((R() * 2 - 1) * HalfW * 1.1f, (R() * 2 - 1) * HalfH * 1.05f, 0);
+                star.transform.position = new Vector3((R() * 2 - 1) * HalfW * 1.1f, (R() * 2 - 1) * HalfH * 1.05f, 5);
                 star.transform.localScale = Vector3.one * Mathf.Lerp(0.03f, 0.09f, R());
                 star.color = new Color(0.8f, 0.85f, 1f, Mathf.Lerp(0.15f, 0.6f, R()));
             }
@@ -177,6 +222,14 @@ namespace VoidProspector.Core
             // Just above the bottom panel; the space around the ship stays clear of UI (prototype lesson).
             Ship.position = new Vector3(0, -HalfH + UiToWorld(Hud.BottomPanelHeight) + 1.0f, 0);
             Ship.localScale = Vector3.one * 0.9f;
+
+            if (lowPoly)
+            {
+                // The hidden sprite still lends its material to the lasers and particles.
+                hull.enabled = false;
+                LowPolyShip.Build(Ship, shipColor);
+                return hull;
+            }
 
             var drill = ShapeSprites.NewRenderer("Drill", ShapeSprites.Square, Ship, 11);
             drill.color = new Color(0.85f, 0.95f, 1f);
