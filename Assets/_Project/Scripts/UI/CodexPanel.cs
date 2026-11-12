@@ -14,16 +14,12 @@ namespace VoidProspector.UI
     /// The Mineral Codex: a grid of minerals × purity grades. Filled entries show their value bonus. Also toasts
     /// new entries of a good grade, and owns its HUD button.
     /// </summary>
-    public class CodexPanel : MonoBehaviour
+    public class CodexPanel : MonoBehaviour, ITabPage
     {
-        const float RowHeight = 76f;
+        const float RowHeight = 84f;
         const int ToastFromGrade = 1;
 
-        static readonly Color PanelColor = new Color(0.08f, 0.1f, 0.18f, 0.98f);
-        static readonly Color RowColor = new Color(1f, 1f, 1f, 0.06f);
-        static readonly Color ButtonColor = new Color(0.22f, 0.24f, 0.32f);
         static readonly Color EmptyCell = new Color(1f, 1f, 1f, 0.05f);
-        static readonly Color MutedColor = new Color(0.75f, 0.85f, 1f);
         static readonly Color ToastColor = new Color(0.75f, 0.95f, 1f);
 
         class Cell
@@ -36,6 +32,7 @@ namespace VoidProspector.UI
         {
             public MineralDefinition mineral;
             public TextMeshProUGUI name;
+            public Image icon;
             public Cell[] cells;
         }
 
@@ -43,15 +40,15 @@ namespace VoidProspector.UI
         RectTransform _canvas;
         TextMeshProUGUI _summary;
         readonly List<MineralRow> _rows = new List<MineralRow>();
+        readonly ReactiveProperty<bool> _open = new ReactiveProperty<bool>(false);
 
         GameSession Session => _root.Session;
+        public ReadOnlyReactiveProperty<bool> IsOpenRx => _open;
 
-        public void Init(GameRoot root, RectTransform hudCanvas, int slot)
+        public void Init(GameRoot root)
         {
             _root = root;
-            var button = UiFactory.Button(hudCanvas, "Codex", ButtonColor, Open, out var label, 30);
-            label.text = "<b>CODEX</b>";
-            RefineryPanel.HudSlot((RectTransform)button.transform, slot);
+            _open.AddTo(this);
             Build();
             _canvas.gameObject.SetActive(false);
 
@@ -63,13 +60,18 @@ namespace VoidProspector.UI
             if (_canvas != null) Destroy(_canvas.gameObject);
         }
 
-        void Open()
+        public void Open()
         {
             _canvas.gameObject.SetActive(true);
+            _open.Value = true;
             Redraw();
         }
 
-        void Close() => _canvas.gameObject.SetActive(false);
+        public void Close()
+        {
+            _canvas.gameObject.SetActive(false);
+            _open.Value = false;
+        }
 
         void OnDiscovered((MineralDefinition mineral, int grade) entry)
         {
@@ -106,35 +108,27 @@ namespace VoidProspector.UI
                 row.name.text = any
                     ? $"<color=#{UiFactory.Hex(row.mineral.color)}><b>{row.mineral.displayName}</b></color>{bonus}"
                     : $"<color=#808080>{row.mineral.displayName}</color>";
+                row.icon.color = any ? Color.white : new Color(0.2f, 0.22f, 0.28f, 1f);   // undiscovered: a silhouette
             }
         }
 
         void Build()
         {
-            var panel = UiFactory.Modal("Codex", 91, PanelColor, new Vector2(30, 60), out _canvas);
+            var panel = UiFactory.Modal("Codex", "MINERAL CODEX", 91, true, Close, out _canvas);
 
-            var title = UiFactory.Text(panel, "Title", "MINERAL CODEX", 60, TextAlignmentOptions.Center, Color.white);
-            title.fontStyle = FontStyles.Bold;
-            UiFactory.Strip(title.rectTransform, true, 110);
+            _summary = UiFactory.Text(panel, "Summary", "", 28, TextAlignmentOptions.Center, UiTheme.Muted);
+            UiFactory.Strip(_summary.rectTransform, true, 50);
 
-            _summary = UiFactory.Text(panel, "Summary", "", 28, TextAlignmentOptions.Center, MutedColor);
-            var srt = _summary.rectTransform;
-            UiFactory.Strip(srt, true, 50);
-            srt.offsetMin += new Vector2(0, -110);
-            srt.offsetMax += new Vector2(0, -110);
-
-            var close = UiFactory.Button(panel, "Close", ButtonColor, Close, out var closeLabel, 44);
-            closeLabel.text = "CLOSE";
-            UiFactory.PlaceFromBottom((RectTransform)close.transform, 0.25f, 0.75f, 30, 110, 0);
-
-            var content = UiFactory.ScrollList(panel, new Vector2(24, 160), new Vector2(-24, -180), 8);
+            var content = UiFactory.ScrollList(panel, Vector2.zero, new Vector2(0, -60), 8);
 
             // Header row: grade names.
             var purity = Session.Purity;
-            var header = UiFactory.ListRow(content, "Grades", 56, new Color(0, 0, 0, 0));
+            var header = UiFactory.Rect("Grades", content);
+            header.gameObject.AddComponent<LayoutElement>().preferredHeight = 56;
             for (int g = 0; g < purity.Count; g++)
             {
-                var t = UiFactory.Text(header, purity[g].name, purity[g].name, 24, TextAlignmentOptions.Center, MutedColor);
+                var t = UiFactory.Text(header, purity[g].name, purity[g].name, 24, TextAlignmentOptions.Center, purity[g].tint);
+                t.fontStyle = FontStyles.Bold;
                 PlaceColumn(t.rectTransform, g, purity.Count);
             }
 
@@ -144,19 +138,21 @@ namespace VoidProspector.UI
 
         static MineralRow BuildRow(RectTransform content, MineralDefinition mineral, int grades)
         {
-            var rt = UiFactory.ListRow(content, mineral.id, RowHeight, RowColor);
+            var rt = UiFactory.ListRow(content, mineral.id, RowHeight);
             var row = new MineralRow { mineral = mineral, cells = new Cell[grades] };
-            row.name = UiFactory.Text(rt, "Name", mineral.displayName, 32, TextAlignmentOptions.Left, Color.white);
+            row.icon = UiFactory.Icon(rt, "Icon", UiTheme.Mineral(mineral.id), Color.white);
+            UiFactory.Square(row.icon.rectTransform, new Vector2(0, 0.5f), new Vector2(46, 0), 60);
+            row.name = UiFactory.Text(rt, "Name", mineral.displayName, 28, TextAlignmentOptions.Left, Color.white);
             row.name.rectTransform.anchorMin = Vector2.zero;
             row.name.rectTransform.anchorMax = new Vector2(0.3f, 1);
-            row.name.rectTransform.offsetMin = new Vector2(16, 0);
+            row.name.rectTransform.offsetMin = new Vector2(84, 0);
             row.name.rectTransform.offsetMax = Vector2.zero;
             for (int g = 0; g < grades; g++)
             {
                 var img = UiFactory.Panel("Grade " + g, rt, EmptyCell);
                 PlaceColumn(img.rectTransform, g, grades);
-                img.rectTransform.offsetMin += new Vector2(0, 8);
-                img.rectTransform.offsetMax += new Vector2(0, -8);
+                img.rectTransform.offsetMin += new Vector2(0, 12);
+                img.rectTransform.offsetMax += new Vector2(0, -12);
                 var text = UiFactory.Text(img.rectTransform, "Text", "—", 26, TextAlignmentOptions.Center, Color.white);
                 UiFactory.Stretch(text.rectTransform);
                 row.cells[g] = new Cell { image = img, text = text };
@@ -164,12 +160,12 @@ namespace VoidProspector.UI
             return row;
         }
 
-        /// <summary>Grade columns share the right 70% of a row.</summary>
+        /// <summary>Grade columns share the right 68% of a row (inside the row frame's edge).</summary>
         static void PlaceColumn(RectTransform rt, int index, int count)
         {
-            float w = 0.7f / count;
-            rt.anchorMin = new Vector2(0.3f + w * index, 0);
-            rt.anchorMax = new Vector2(0.3f + w * (index + 1), 1);
+            float w = 0.67f / count;
+            rt.anchorMin = new Vector2(0.31f + w * index, 0);
+            rt.anchorMax = new Vector2(0.31f + w * (index + 1), 1);
             rt.offsetMin = new Vector2(4, 0);
             rt.offsetMax = new Vector2(-4, 0);
         }

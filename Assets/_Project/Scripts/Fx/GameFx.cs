@@ -26,13 +26,11 @@ namespace VoidProspector.Fx
         float _lastCargoFull = -10f;
 
         RectTransform _layer;
-        TextMeshProUGUI _toast;
-        float _toastAge = 99f;
-        Color _toastColor;
+        ToastView _toast;
         readonly List<Popup> _active = new List<Popup>();
         readonly Stack<Popup> _pool = new Stack<Popup>();
 
-        public void Init(Camera cam, Material particleMaterial, RectTransform popupLayer, TextMeshProUGUI toast)
+        public void Init(Camera cam, Material particleMaterial, RectTransform popupLayer, ToastView toast)
         {
             _cam = cam;
             _camBase = cam.transform.position;
@@ -124,12 +122,7 @@ namespace VoidProspector.Fx
             _active.Add(p);
         }
 
-        public void Toast(string message, Color color)
-        {
-            _toast.text = message;
-            _toastColor = color;
-            _toastAge = 0;
-        }
+        public void Toast(string message, Color color) => _toast.Show(message, color);
 
         /// <summary>Rate-limited "cargo full" toast. Returns true when it was shown.</summary>
         public bool CargoFull()
@@ -173,10 +166,6 @@ namespace VoidProspector.Fx
                 c.a *= 1f - Mathf.Pow(p.age / p.life, 2);
                 p.text.color = c;
             }
-
-            _toastAge += dt;
-            float ta = Mathf.Clamp01(2f - _toastAge / 0.8f);   // visible ~1.6 s
-            _toast.color = new Color(_toastColor.r, _toastColor.g, _toastColor.b, ta);
         }
 
         void LateUpdate()

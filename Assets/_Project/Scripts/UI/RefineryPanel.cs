@@ -11,22 +11,15 @@ using VoidProspector.Refining;
 namespace VoidProspector.UI
 {
     /// <summary>
-    /// The refinery: its HUD button (with progress), the dialog (batch status, odds, collect / sell, target grade)
-    /// and the list of cargo stacks that can be loaded. Also ticks the refinery each frame (scaled time).
-    /// The dialog polls the session a few times a second while open.
+    /// The refinery: its tab (locked until the refinery's sector, then showing progress), the dialog (batch status,
+    /// odds, collect / sell, target grade) and the list of cargo stacks that can be loaded. Also ticks the refinery
+    /// each frame (scaled time). The dialog polls the session a few times a second while open.
     /// </summary>
-    public class RefineryPanel : MonoBehaviour
+    public class RefineryPanel : MonoBehaviour, ITabPage
     {
         const float RedrawSeconds = 0.25f;
-        const float RowHeight = 96f;
+        const float RowHeight = 100f;
 
-        static readonly Color PanelColor = new Color(0.08f, 0.1f, 0.18f, 0.98f);
-        static readonly Color RowColor = new Color(1f, 1f, 1f, 0.06f);
-        static readonly Color ButtonColor = new Color(0.22f, 0.24f, 0.32f);
-        static readonly Color HudReadyColor = new Color(0.65f, 0.5f, 0.15f);
-        static readonly Color LoadColor = new Color(0.16f, 0.36f, 0.56f);
-        static readonly Color SellColor = new Color(0.18f, 0.5f, 0.3f);
-        static readonly Color MutedColor = new Color(0.75f, 0.85f, 1f);
         static readonly Color GoodColor = new Color(0.55f, 0.95f, 0.6f);
         static readonly Color ToastColor = new Color(0.85f, 0.75f, 1f);
         static readonly Color FillColor = new Color(0.7f, 0.55f, 1f);
@@ -35,34 +28,50 @@ namespace VoidProspector.UI
         {
             public RectTransform root;
             public TextMeshProUGUI text, loadLabel;
-            public Button load;
+            public Image icon;
+            public UiButton load;
             public MineralDefinition mineral;
             public int grade;
         }
 
         GameRoot _root;
+        TabBar.Tab _tab;
         RectTransform _canvas, _list, _fill;
-        Button _hudButton, _collect, _sell, _target;
-        Image _hudImage;
-        TextMeshProUGUI _hudLabel, _batch, _odds, _worth, _targetLabel, _listHeader;
+        UiButton _collect, _sell, _target;
+        TextMeshProUGUI _batch, _odds, _worth, _targetLabel, _listHeader;
+        Image _batchIcon;
         readonly List<StackRow> _rows = new List<StackRow>();
         readonly List<(MineralDefinition mineral, int grade, int count, GameNumber value)> _stacks =
             new List<(MineralDefinition, int, int, GameNumber)>();
+        readonly ReactiveProperty<bool> _open = new ReactiveProperty<bool>(false);
         float _redraw;
 
         GameSession Session => _root.Session;
         Refinery Refinery => Session.Refinery;
-        bool IsOpen => _canvas.gameObject.activeSelf;
+        bool IsOpen => _open.Value;
+        public ReadOnlyReactiveProperty<bool> IsOpenRx => _open;
 
-        public void Init(GameRoot root, RectTransform hudCanvas, int slot)
+        public void Init(GameRoot root, TabBar.Tab tab)
         {
             _root = root;
-            BuildHudButton(hudCanvas, slot);
+            _tab = tab;
+            _open.AddTo(this);
             Build();
             _canvas.gameObject.SetActive(false);
 
+            int unlockSector = Session.Database.refinery != null ? Session.Database.refinery.unlockSector : 3;
+            _tab.onLocked = () =>
+            {
+                _root.Audio.Deny();
+                _root.Fx.Toast($"The refinery opens in Sector {unlockSector}", UiTheme.Muted);
+            };
             Session.UnlockedSectorRx
-                .Subscribe(_ => _hudButton.gameObject.SetActive(Session.RefineryUnlocked))
+                .Subscribe(_ =>
+                {
+                    _tab.locked = !Session.RefineryUnlocked;
+                    _tab.SetIcon(UiTheme.Icon(_tab.locked ? "lock" : "refinery"));
+                    DrawTab();
+                })
                 .AddTo(this);
             Refinery.Stepped.Subscribe(OnStep).AddTo(this);
         }
@@ -78,19 +87,24 @@ namespace VoidProspector.UI
             _redraw -= Time.unscaledDeltaTime;
             if (_redraw > 0) return;
             _redraw = RedrawSeconds;
-            DrawHudButton();
+            DrawTab();
             if (IsOpen) Redraw();
         }
 
         // ---------- Actions ----------
 
-        void Open()
+        public void Open()
         {
             _canvas.gameObject.SetActive(true);
+            _open.Value = true;
             Redraw();
         }
 
-        void Close() => _canvas.gameObject.SetActive(false);
+        public void Close()
+        {
+            _canvas.gameObject.SetActive(false);
+            _open.Value = false;
+        }
 
         void OnLoad(StackRow row)
         {
@@ -150,30 +164,35 @@ namespace VoidProspector.UI
 
         // ---------- Drawing ----------
 
-        void DrawHudButton()
+        /// <summary>The tab's label shows progress; it turns gold when a batch is done.</summary>
+        void DrawTab()
         {
             var r = Refinery;
-            if (r.IsEmpty) _hudLabel.text = "REFINE";
-            else if (r.IsDone) _hudLabel.text = "REFINE <size=24>DONE</size>";
+            if (_tab.locked || r.IsEmpty) _tab.label.text = "Refinery";
+            else if (r.IsDone) _tab.label.text = "DONE";
             else
             {
                 double cycle = r.CycleSeconds(r.Grade, Session.RefineryStats);
                 int pct = cycle > 0 ? Mathf.FloorToInt((float)(r.Progress / cycle) * 100) : 0;
-                _hudLabel.text = $"REFINE <size=24>{pct}%</size>";
+                _tab.label.text = $"Refining {pct}%";
             }
-            _hudImage.color = r.IsDone ? HudReadyColor : ButtonColor;
+            _tab.SetAlert(!_tab.locked && r.IsDone);
         }
 
         void Redraw()
         {
             _redraw = RedrawSeconds;
-            DrawHudButton();
+            DrawTab();
             var r = Refinery;
             var purity = Session.Purity;
             var stats = Session.RefineryStats;
             var inv = CultureInfo.InvariantCulture;
 
             _targetLabel.text = $"Stop at\n<size=26>{purity[r.TargetGrade].name}</size>";
+
+            _batchIcon.sprite = r.IsEmpty ? UiTheme.Icon("refinery") : UiTheme.Mineral(r.Mineral.id);
+            _batchIcon.color = r.IsEmpty ? UiTheme.Faint : Color.white;
+            _batchIcon.enabled = _batchIcon.sprite != null;
 
             if (r.IsEmpty)
             {
@@ -231,6 +250,11 @@ namespace VoidProspector.UI
                 if (i >= _rows.Count) _rows.Add(BuildRow(_list));
                 var row = _rows[i];
                 var (mineral, grade, count, value) = _stacks[i];
+                if (row.mineral != mineral)
+                {
+                    row.icon.sprite = UiTheme.Mineral(mineral.id);
+                    row.icon.enabled = row.icon.sprite != null;
+                }
                 row.mineral = mineral;
                 row.grade = grade;
                 row.root.gameObject.SetActive(true);
@@ -247,92 +271,73 @@ namespace VoidProspector.UI
 
         // ---------- Building ----------
 
-        void BuildHudButton(RectTransform hudCanvas, int slot)
-        {
-            _hudButton = UiFactory.Button(hudCanvas, "Refine", ButtonColor, Open, out _hudLabel, 30);
-            _hudLabel.fontStyle = FontStyles.Bold;
-            _hudImage = (Image)_hudButton.targetGraphic;
-            HudSlot((RectTransform)_hudButton.transform, slot);
-        }
-
-        /// <summary>Small buttons down the right edge, under the top bar.</summary>
-        public static void HudSlot(RectTransform rt, int slot)
-        {
-            rt.anchorMin = rt.anchorMax = new Vector2(1, 1);
-            rt.pivot = new Vector2(1, 1);
-            rt.anchoredPosition = new Vector2(-16, -Hud.TopBarHeight - 16 - slot * 80);
-            rt.sizeDelta = new Vector2(220, 68);
-        }
-
         void Build()
         {
-            var panel = UiFactory.Modal("Refinery", 92, PanelColor, new Vector2(30, 60), out _canvas);
+            var panel = UiFactory.Modal("Refinery", "REFINERY", 92, true, Close, out _canvas);
 
-            var title = UiFactory.Text(panel, "Title", "REFINERY", 60, TextAlignmentOptions.Center, Color.white);
-            title.fontStyle = FontStyles.Bold;
-            UiFactory.Strip(title.rectTransform, true, 110);
-
-            // Batch status, under the title.
-            var status = UiFactory.Rect("Status", panel);
+            // Batch status in a card at the top.
+            var status = UiFactory.Frame("Status", panel, UiTheme.Card, new Color(1f, 1f, 1f, 0.06f), 0.8f).rectTransform;
             status.anchorMin = new Vector2(0, 1);
             status.anchorMax = new Vector2(1, 1);
             status.pivot = new Vector2(0.5f, 1);
-            status.offsetMin = new Vector2(30, -530);
-            status.offsetMax = new Vector2(-30, -120);
+            status.offsetMin = new Vector2(0, -440);
+            status.offsetMax = Vector2.zero;
 
-            _batch = UiFactory.Text(status, "Batch", "", 44, TextAlignmentOptions.Left, Color.white);
-            UiFactory.PlaceFromBottom(_batch.rectTransform, 0f, 1f, 350, 60, 0);
+            _batchIcon = UiFactory.Icon(status, "Batch Icon", null, Color.white);
+            UiFactory.Square(_batchIcon.rectTransform, Vector2.zero, new Vector2(78, 384), 80);
 
-            _odds = UiFactory.Text(status, "Odds", "", 28, TextAlignmentOptions.TopLeft, MutedColor);
+            _batch = UiFactory.Text(status, "Batch", "", 42, TextAlignmentOptions.Left, UiTheme.Text);
+            UiFactory.PlaceFromBottom(_batch.rectTransform, 0f, 1f, 356, 60, 30);
+            _batch.rectTransform.offsetMin = new Vector2(132, 356);
+
+            _odds = UiFactory.Text(status, "Odds", "", 27, TextAlignmentOptions.TopLeft, UiTheme.Muted);
             _odds.textWrappingMode = TextWrappingModes.Normal;
-            UiFactory.PlaceFromBottom(_odds.rectTransform, 0f, 1f, 220, 120, 0);
+            UiFactory.PlaceFromBottom(_odds.rectTransform, 0f, 1f, 222, 116, 30);
 
-            _worth = UiFactory.Text(status, "Worth", "", 32, TextAlignmentOptions.Left, new Color(1f, 0.9f, 0.5f));
-            UiFactory.PlaceFromBottom(_worth.rectTransform, 0f, 1f, 172, 44, 0);
+            _worth = UiFactory.Text(status, "Worth", "", 30, TextAlignmentOptions.Left, UiTheme.Credits);
+            UiFactory.PlaceFromBottom(_worth.rectTransform, 0f, 1f, 180, 42, 30);
 
-            var bar = UiFactory.Panel("Progress", status, new Color(1, 1, 1, 0.12f)).rectTransform;
-            UiFactory.PlaceFromBottom(bar, 0f, 1f, 140, 22, 0);
-            _fill = UiFactory.Rect("Fill", bar);
-            _fill.anchorMin = Vector2.zero;
-            _fill.anchorMax = new Vector2(0, 1);
-            _fill.offsetMin = _fill.offsetMax = Vector2.zero;
-            _fill.gameObject.AddComponent<Image>().color = FillColor;
+            var bar = UiFactory.Rect("Progress", status);
+            UiFactory.PlaceFromBottom(bar, 0f, 1f, 142, 30, 30);
+            _fill = UiFactory.Bar(bar, "Bar", FillColor, out _);
+            UiFactory.Stretch((RectTransform)_fill.parent);
 
-            _target = UiFactory.Button(status, "Target", ButtonColor, OnCycleTarget, out _targetLabel, 30);
-            UiFactory.PlaceFromBottom((RectTransform)_target.transform, 0f, 0.333f, 10, 110, 6);
-            _collect = UiFactory.Button(status, "Collect", LoadColor, OnCollect, out var collectLabel, 36);
-            collectLabel.text = "<b>COLLECT</b>\n<size=24>to cargo</size>";
-            UiFactory.PlaceFromBottom((RectTransform)_collect.transform, 0.333f, 0.667f, 10, 110, 6);
-            _sell = UiFactory.Button(status, "Sell", SellColor, OnSell, out var sellLabel, 36);
-            sellLabel.text = "<b>SELL</b>";
-            UiFactory.PlaceFromBottom((RectTransform)_sell.transform, 0.667f, 1f, 10, 110, 6);
+            _target = UiFactory.Button(status, "Target", ButtonStyle.Secondary, OnCycleTarget, out _targetLabel, 28);
+            UiFactory.PlaceFromBottom((RectTransform)_target.transform, 0f, 0.333f, 24, 104, 0);
+            ((RectTransform)_target.transform).offsetMin = new Vector2(24, 24);
+            _collect = UiFactory.Button(status, "Collect", ButtonStyle.Primary, OnCollect, out var collectLabel, 34);
+            collectLabel.text = "COLLECT\n<size=22>to cargo</size>";
+            UiFactory.PlaceFromBottom((RectTransform)_collect.transform, 0.333f, 0.667f, 24, 104, 8);
+            _sell = UiFactory.Button(status, "Sell", ButtonStyle.Confirm, OnSell, out var sellLabel, 34);
+            sellLabel.text = "SELL";
+            UiFactory.PlaceFromBottom((RectTransform)_sell.transform, 0.667f, 1f, 24, 104, 0);
+            ((RectTransform)_sell.transform).offsetMax = new Vector2(-24, 128);
 
-            _listHeader = UiFactory.Text(panel, "Cargo Header", "CARGO", 34, TextAlignmentOptions.BottomLeft, MutedColor);
+            _listHeader = UiFactory.Text(panel, "Cargo Header", "CARGO", 32, TextAlignmentOptions.BottomLeft, UiTheme.Accent);
             _listHeader.fontStyle = FontStyles.Bold;
+            _listHeader.characterSpacing = 4;
             var lrt = _listHeader.rectTransform;
             lrt.anchorMin = new Vector2(0, 1);
             lrt.anchorMax = new Vector2(1, 1);
             lrt.pivot = new Vector2(0.5f, 1);
-            lrt.offsetMin = new Vector2(30, -600);
-            lrt.offsetMax = new Vector2(-30, -540);
+            lrt.offsetMin = new Vector2(8, -510);
+            lrt.offsetMax = new Vector2(-8, -450);
 
-            var close = UiFactory.Button(panel, "Close", ButtonColor, Close, out var closeLabel, 44);
-            closeLabel.text = "CLOSE";
-            UiFactory.PlaceFromBottom((RectTransform)close.transform, 0.25f, 0.75f, 30, 110, 0);
-
-            _list = UiFactory.ScrollList(panel, new Vector2(24, 160), new Vector2(-24, -610), 10);
+            _list = UiFactory.ScrollList(panel, Vector2.zero, new Vector2(0, -520), 8);
         }
 
         StackRow BuildRow(RectTransform content)
         {
-            var rt = UiFactory.ListRow(content, "Stack", RowHeight, RowColor);
+            var rt = UiFactory.ListRow(content, "Stack", RowHeight);
             var row = new StackRow { root = rt };
-            row.text = UiFactory.Text(rt, "Text", "", 32, TextAlignmentOptions.Left, Color.white);
+            row.icon = UiFactory.Icon(rt, "Icon", null, Color.white);
+            UiFactory.Square(row.icon.rectTransform, new Vector2(0, 0.5f), new Vector2(54, 0), 64);
+            row.text = UiFactory.Text(rt, "Text", "", 30, TextAlignmentOptions.Left, UiTheme.Text);
             row.text.rectTransform.anchorMin = Vector2.zero;
             row.text.rectTransform.anchorMax = new Vector2(0.72f, 1);
-            row.text.rectTransform.offsetMin = new Vector2(20, 0);
+            row.text.rectTransform.offsetMin = new Vector2(100, 0);
             row.text.rectTransform.offsetMax = Vector2.zero;
-            row.load = UiFactory.Button(rt, "Load", LoadColor, () => OnLoad(row), out row.loadLabel, 30);
+            row.load = UiFactory.Button(rt, "Load", ButtonStyle.Primary, () => OnLoad(row), out row.loadLabel, 28);
             var brt = (RectTransform)row.load.transform;
             brt.anchorMin = new Vector2(0.72f, 0);
             brt.anchorMax = Vector2.one;

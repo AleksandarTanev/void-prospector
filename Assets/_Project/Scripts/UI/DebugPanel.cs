@@ -12,8 +12,6 @@ namespace VoidProspector.UI
     /// </summary>
     public class DebugPanel : MonoBehaviour
     {
-        static readonly Color DevColor = new Color(0.35f, 0.2f, 0.2f, 0.9f);
-
         GameRoot _root;
         RectTransform _panel;
         TextMeshProUGUI _speedLabel;
@@ -22,7 +20,7 @@ namespace VoidProspector.UI
         {
             _root = root;
 
-            var toggle = UiFactory.Button(canvas, "DEV", DevColor, () => _panel.gameObject.SetActive(!_panel.gameObject.activeSelf), out _, 28);
+            var toggle = UiFactory.Button(canvas, "DEV", ButtonStyle.Secondary, () => _panel.gameObject.SetActive(!_panel.gameObject.activeSelf), out _, 28);
             var trt = (RectTransform)toggle.transform;
             trt.anchorMin = trt.anchorMax = new Vector2(0, 1);
             trt.pivot = new Vector2(0, 1);
@@ -52,7 +50,7 @@ namespace VoidProspector.UI
 
         TextMeshProUGUI AddButton(string label, UnityEngine.Events.UnityAction action, ref int index)
         {
-            var b = UiFactory.Button(_panel, label, DevColor, action, out var text, 30);
+            var b = UiFactory.Button(_panel, label, ButtonStyle.Secondary, action, out var text, 28);
             var rt = (RectTransform)b.transform;
             rt.anchorMin = new Vector2(0, 1);
             rt.anchorMax = new Vector2(1, 1);

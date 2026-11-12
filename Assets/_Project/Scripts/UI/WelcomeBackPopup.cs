@@ -9,12 +9,6 @@ namespace VoidProspector.UI
     /// <summary>"Welcome back" dialog after offline earnings. Dims and blocks the game until closed.</summary>
     public class WelcomeBackPopup : MonoBehaviour
     {
-        static readonly Color DimColor = new Color(0f, 0f, 0f, 0.7f);
-        static readonly Color PanelColor = new Color(0.08f, 0.1f, 0.18f, 0.97f);
-        static readonly Color CollectColor = new Color(0.18f, 0.5f, 0.3f);
-        static readonly Color CreditsColor = new Color(1f, 0.9f, 0.5f);
-        static readonly Color MutedColor = new Color(0.75f, 0.85f, 1f);
-
         GameRoot _root;
         RectTransform _canvas;
         TextMeshProUGUI _away, _credits, _note, _refined;
@@ -55,34 +49,39 @@ namespace VoidProspector.UI
             _canvas = UiFactory.Canvas("Welcome Back");
             _canvas.GetComponent<Canvas>().sortingOrder = 100;   // above the HUD
 
-            var dim = UiFactory.Panel("Dim", _canvas, DimColor);   // also swallows taps meant for meteors
+            var dim = UiFactory.Panel("Dim", _canvas, UiTheme.Dim);   // also swallows taps meant for meteors
             UiFactory.Stretch(dim.rectTransform);
 
-            var panel = UiFactory.Panel("Panel", _canvas, PanelColor).rectTransform;
+            var panel = UiFactory.Frame("Panel", _canvas, UiTheme.Panel, UiTheme.PanelFallback).rectTransform;
             panel.anchorMin = panel.anchorMax = new Vector2(0.5f, 0.55f);
-            panel.sizeDelta = new Vector2(860, 680);
+            panel.sizeDelta = new Vector2(900, 740);
 
-            var title = UiFactory.Text(panel, "Title", "WELCOME BACK", 64, TextAlignmentOptions.Center, Color.white);
+            var plate = UiFactory.Frame("Title Plate", panel, UiTheme.Header, UiTheme.PanelFallback).rectTransform;
+            UiFactory.PlaceFromBottom(plate, 0f, 1f, 610, 104, 36);
+            var title = UiFactory.Text(plate, "Title", "WELCOME BACK", 56, TextAlignmentOptions.Center, UiTheme.Text);
             title.fontStyle = FontStyles.Bold;
-            Row(title.rectTransform, 580, 80);
+            title.characterSpacing = 6;
+            UiFactory.Stretch(title.rectTransform);
 
-            _away = UiFactory.Text(panel, "Away", "", 38, TextAlignmentOptions.Center, MutedColor);
-            Row(_away.rectTransform, 500, 50);
+            _away = UiFactory.Text(panel, "Away", "", 36, TextAlignmentOptions.Center, UiTheme.Muted);
+            Row(_away.rectTransform, 530, 50);
 
-            _credits = UiFactory.Text(panel, "Credits", "", 96, TextAlignmentOptions.Center, CreditsColor);
+            var coin = UiFactory.Icon(panel, "Coin", UiTheme.Icon("credits"), UiTheme.Credits);
+            UiFactory.Square(coin.rectTransform, new Vector2(0.5f, 0), new Vector2(0, 470), 72);
+
+            _credits = UiFactory.Text(panel, "Credits", "", 96, TextAlignmentOptions.Center, UiTheme.Credits);
             _credits.fontStyle = FontStyles.Bold;
-            Row(_credits.rectTransform, 360, 120);
+            Row(_credits.rectTransform, 300, 120);
 
-            _note = UiFactory.Text(panel, "Note", "", 30, TextAlignmentOptions.Center, MutedColor);
-            Row(_note.rectTransform, 290, 40);
+            _note = UiFactory.Text(panel, "Note", "", 28, TextAlignmentOptions.Center, UiTheme.Muted);
+            Row(_note.rectTransform, 250, 40);
 
-            _refined = UiFactory.Text(panel, "Refined", "", 30, TextAlignmentOptions.Center, CreditsColor);
-            Row(_refined.rectTransform, 230, 40);
+            _refined = UiFactory.Text(panel, "Refined", "", 28, TextAlignmentOptions.Center, UiTheme.Refine);
+            Row(_refined.rectTransform, 200, 40);
 
-            var collect = UiFactory.Button(panel, "Collect", CollectColor, Close, out var label, 52);
-            label.fontStyle = FontStyles.Bold;
+            var collect = UiFactory.Button(panel, "Collect", ButtonStyle.Confirm, Close, out var label, 52);
             label.text = "COLLECT";
-            UiFactory.PlaceFromBottom((RectTransform)collect.transform, 0.2f, 0.8f, 50, 130, 0);
+            UiFactory.PlaceFromBottom((RectTransform)collect.transform, 0.2f, 0.8f, 50, 124, 0);
         }
 
         /// <summary>A full-width line in the panel, <paramref name="bottom"/> pixels from its bottom edge.</summary>

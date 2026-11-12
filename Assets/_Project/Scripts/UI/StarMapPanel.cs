@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using System.Globalization;
+using R3;
 using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
@@ -13,49 +14,43 @@ namespace VoidProspector.UI
     /// A modal over the game; it polls the session a few times a second while open, since the counters it shows
     /// change thousands of times per minute.
     /// </summary>
-    public class StarMapPanel : MonoBehaviour
+    public class StarMapPanel : MonoBehaviour, ITabPage
     {
         const float RedrawSeconds = 0.25f;
         const float SectorRowHeight = 170f;
-        const float MilestoneRowHeight = 84f;
+        const float MilestoneRowHeight = 92f;
 
-        static readonly Color DimColor = new Color(0f, 0f, 0f, 0.75f);
-        static readonly Color PanelColor = new Color(0.08f, 0.1f, 0.18f, 0.98f);
-        static readonly Color RowColor = new Color(1f, 1f, 1f, 0.06f);
-        static readonly Color HereColor = new Color(0.25f, 0.28f, 0.36f);
-        static readonly Color TravelColor = new Color(0.16f, 0.36f, 0.56f);
-        static readonly Color JumpColor = new Color(0.65f, 0.5f, 0.15f);
-        static readonly Color CloseColor = new Color(0.22f, 0.24f, 0.32f);
-        static readonly Color MutedColor = new Color(0.75f, 0.85f, 1f);
-        static readonly Color DoneColor = new Color(0.55f, 0.95f, 0.6f);
         static readonly Color ToastColor = new Color(1f, 0.8f, 0.4f);
 
         class SectorRow
         {
             public SectorDefinition sector;
             public TextMeshProUGUI title, status, actionLabel;
-            public Button action;
-            public Image actionImage;
+            public UiButton action;
         }
 
         class MilestoneRow
         {
             public MilestoneDefinition milestone;
             public TextMeshProUGUI text;
+            public Image icon;
         }
 
         GameRoot _root;
         RectTransform _canvas;
         readonly List<SectorRow> _sectors = new List<SectorRow>();
         readonly List<MilestoneRow> _milestones = new List<MilestoneRow>();
+        readonly ReactiveProperty<bool> _open = new ReactiveProperty<bool>(false);
         float _redraw;
 
         GameSession Session => _root.Session;
-        public bool IsOpen => _canvas != null && _canvas.gameObject.activeSelf;
+        public bool IsOpen => _open.Value;
+        public ReadOnlyReactiveProperty<bool> IsOpenRx => _open;
 
         public void Init(GameRoot root)
         {
             _root = root;
+            _open.AddTo(this);
             Build();
             _canvas.gameObject.SetActive(false);
         }
@@ -68,10 +63,15 @@ namespace VoidProspector.UI
         public void Open()
         {
             _canvas.gameObject.SetActive(true);
+            _open.Value = true;
             Redraw();
         }
 
-        public void Close() => _canvas.gameObject.SetActive(false);
+        public void Close()
+        {
+            _canvas.gameObject.SetActive(false);
+            _open.Value = false;
+        }
 
         void Update()
         {
@@ -121,12 +121,12 @@ namespace VoidProspector.UI
             if (s == session.Sector)
             {
                 row.status.text = $"You are here · depth {depths.Deepest + 1}/{depths.MaxDepth} unlocked";
-                SetAction(row, true, "HERE", HereColor, false);
+                SetAction(row, true, "HERE", ButtonStyle.Secondary, false);
             }
             else if (session.IsUnlocked(s))
             {
                 row.status.text = $"Depth {depths.Deepest + 1}/{depths.MaxDepth} unlocked";
-                SetAction(row, true, "TRAVEL", TravelColor, true);
+                SetAction(row, true, "TRAVEL", ButtonStyle.Primary, true);
             }
             else if (s == session.NextSector)
             {
@@ -135,18 +135,18 @@ namespace VoidProspector.UI
                 {
                     var from = session.FurthestSector;
                     row.status.text = $"Jump drive: unlock depth {from.maxDepth} in {from.displayName} first";
-                    SetAction(row, true, "LOCKED", HereColor, false);
+                    SetAction(row, true, "LOCKED", ButtonStyle.Secondary, false);
                 }
                 else
                 {
                     row.status.text = "Jump drive: " + CostText(s);
-                    SetAction(row, true, "BUY JUMP DRIVE", JumpColor, state == JumpState.Affordable);
+                    SetAction(row, true, "BUY JUMP DRIVE", ButtonStyle.Gold, state == JumpState.Affordable);
                 }
             }
             else
             {
                 row.status.text = "Locked";
-                SetAction(row, false, "", HereColor, false);
+                SetAction(row, false, "", ButtonStyle.Secondary, false);
             }
         }
 
@@ -179,11 +179,11 @@ namespace VoidProspector.UI
             return string.Join(", ", names);
         }
 
-        static void SetAction(SectorRow row, bool visible, string label, Color color, bool interactable)
+        static void SetAction(SectorRow row, bool visible, string label, ButtonStyle style, bool interactable)
         {
             if (row.action.gameObject.activeSelf != visible) row.action.gameObject.SetActive(visible);
             row.actionLabel.text = label;
-            row.actionImage.color = color;
+            if (row.action.Style != style) row.action.Style = style;
             row.action.interactable = interactable;
         }
 
@@ -194,11 +194,13 @@ namespace VoidProspector.UI
             var inv = CultureInfo.InvariantCulture;
             if (ms.IsDone(m))
             {
-                row.text.color = DoneColor;
+                row.text.color = UiTheme.Good;
+                row.icon.color = UiTheme.Good;
                 row.text.text = $"<b>{m.Title}</b>  DONE\n<size=26>{m.RewardText}</size>";
                 return;
             }
-            row.text.color = Color.white;
+            row.icon.color = UiTheme.Faint;
+            row.text.color = UiTheme.Text;
             string progress = $"{ms.Progress(m).ToString("N0", inv)}/{m.target.ToString("N0", inv)}";
             row.text.text = $"<b>{m.Title}</b>  <size=28>{progress}</size>\n<size=26><color=#BFD9FF>Reward: {m.RewardText}</color></size>";
         }
@@ -207,104 +209,48 @@ namespace VoidProspector.UI
 
         void Build()
         {
-            _canvas = UiFactory.Canvas("Star Map");
-            _canvas.GetComponent<Canvas>().sortingOrder = 90;   // above the HUD, below the welcome-back popup
+            // Above the HUD, below the welcome-back popup.
+            var panel = UiFactory.Modal("Star Map", "STAR MAP", 90, true, Close, out _canvas);
+            var content = UiFactory.ScrollList(panel, Vector2.zero, Vector2.zero, 10);
 
-            var dim = UiFactory.Panel("Dim", _canvas, DimColor);   // swallows taps meant for meteors
-            UiFactory.Stretch(dim.rectTransform);
-
-            var panel = UiFactory.Panel("Panel", _canvas, PanelColor).rectTransform;
-            panel.anchorMin = new Vector2(0, 0);
-            panel.anchorMax = new Vector2(1, 1);
-            panel.offsetMin = new Vector2(30, 60);
-            panel.offsetMax = new Vector2(-30, -60);
-
-            var title = UiFactory.Text(panel, "Title", "STAR MAP", 60, TextAlignmentOptions.Center, Color.white);
-            title.fontStyle = FontStyles.Bold;
-            var trt = title.rectTransform;
-            UiFactory.Strip(trt, true, 110);
-
-            var close = UiFactory.Button(panel, "Close", CloseColor, Close, out var closeLabel, 44);
-            closeLabel.text = "CLOSE";
-            UiFactory.PlaceFromBottom((RectTransform)close.transform, 0.25f, 0.75f, 30, 110, 0);
-
-            // Scrolling list between the title and the close button.
-            var view = UiFactory.Rect("Scroll View", panel);
-            view.anchorMin = Vector2.zero;
-            view.anchorMax = Vector2.one;
-            view.offsetMin = new Vector2(24, 160);
-            view.offsetMax = new Vector2(-24, -120);
-            view.gameObject.AddComponent<Image>().color = new Color(0, 0, 0, 0.01f);   // receives drags
-            view.gameObject.AddComponent<RectMask2D>();
-
-            var content = UiFactory.Rect("Content", view);
-            content.anchorMin = new Vector2(0, 1);
-            content.anchorMax = new Vector2(1, 1);
-            content.pivot = new Vector2(0.5f, 1);
-            content.offsetMin = content.offsetMax = Vector2.zero;
-            var layout = content.gameObject.AddComponent<VerticalLayoutGroup>();
-            layout.spacing = 12;
-            layout.childControlHeight = true;
-            layout.childControlWidth = true;
-            layout.childForceExpandHeight = false;
-            layout.childForceExpandWidth = true;
-            content.gameObject.AddComponent<ContentSizeFitter>().verticalFit = ContentSizeFitter.FitMode.PreferredSize;
-
-            var scroll = view.gameObject.AddComponent<ScrollRect>();
-            scroll.content = content;
-            scroll.viewport = view;
-            scroll.horizontal = false;
-            scroll.movementType = ScrollRect.MovementType.Clamped;
-            scroll.scrollSensitivity = 30;
-
-            Header(content, "SECTORS");
+            UiFactory.ListHeader(content, "SECTORS");
             foreach (var s in Session.Sectors) _sectors.Add(BuildSectorRow(content, s));
 
             if (Session.Milestones.All.Count > 0)
             {
-                Header(content, "MILESTONES");
+                UiFactory.ListHeader(content, "MILESTONES");
                 foreach (var m in Session.Milestones.All) _milestones.Add(BuildMilestoneRow(content, m));
             }
         }
 
-        static void Header(RectTransform content, string text)
-        {
-            var t = UiFactory.Text(content, text, text, 34, TextAlignmentOptions.BottomLeft, MutedColor);
-            t.fontStyle = FontStyles.Bold;
-            t.gameObject.AddComponent<LayoutElement>().preferredHeight = 64;
-        }
-
         SectorRow BuildSectorRow(RectTransform content, SectorDefinition sector)
         {
-            var bg = UiFactory.Panel(sector.id, content, RowColor);
-            bg.gameObject.AddComponent<LayoutElement>().preferredHeight = SectorRowHeight;
-            var rt = bg.rectTransform;
+            var rt = UiFactory.ListRow(content, sector.id, SectorRowHeight);
 
             var row = new SectorRow { sector = sector };
-            row.title = UiFactory.Text(rt, "Title", "", 40, TextAlignmentOptions.Left, Color.white);
-            UiFactory.PlaceFromBottom(row.title.rectTransform, 0f, 1f, 100, 56, 24);
+            row.title = UiFactory.Text(rt, "Title", "", 40, TextAlignmentOptions.Left, UiTheme.Text);
+            UiFactory.PlaceFromBottom(row.title.rectTransform, 0f, 1f, 100, 56, 28);
 
-            row.status = UiFactory.Text(rt, "Status", "", 28, TextAlignmentOptions.Left, MutedColor);
+            row.status = UiFactory.Text(rt, "Status", "", 27, TextAlignmentOptions.Left, UiTheme.Muted);
             row.status.textWrappingMode = TextWrappingModes.Normal;
-            UiFactory.PlaceFromBottom(row.status.rectTransform, 0f, 0.6f, 12, 84, 24);
+            UiFactory.PlaceFromBottom(row.status.rectTransform, 0f, 0.6f, 14, 84, 28);
 
-            row.action = UiFactory.Button(rt, "Action", TravelColor, () => OnAction(row), out row.actionLabel, 32);
-            row.actionLabel.fontStyle = FontStyles.Bold;
-            row.actionImage = (Image)row.action.targetGraphic;
-            UiFactory.PlaceFromBottom((RectTransform)row.action.transform, 0.6f, 1f, 14, 84, 16);
+            row.action = UiFactory.Button(rt, "Action", ButtonStyle.Primary, () => OnAction(row), out row.actionLabel, 30);
+            UiFactory.PlaceFromBottom((RectTransform)row.action.transform, 0.6f, 1f, 16, 84, 18);
             return row;
         }
 
         static MilestoneRow BuildMilestoneRow(RectTransform content, MilestoneDefinition m)
         {
-            var bg = UiFactory.Panel(m.id, content, RowColor);
-            bg.gameObject.AddComponent<LayoutElement>().preferredHeight = MilestoneRowHeight;
-            var text = UiFactory.Text(bg.rectTransform, "Text", "", 32, TextAlignmentOptions.Left, Color.white);
+            var rt = UiFactory.ListRow(content, m.id, MilestoneRowHeight);
+            var icon = UiFactory.Icon(rt, "Icon", UiTheme.Icon("trophy"), UiTheme.Faint);
+            UiFactory.Square(icon.rectTransform, new Vector2(0, 0.5f), new Vector2(54, 0), 56);
+            var text = UiFactory.Text(rt, "Text", "", 30, TextAlignmentOptions.Left, UiTheme.Text);
             text.rectTransform.anchorMin = Vector2.zero;
             text.rectTransform.anchorMax = Vector2.one;
-            text.rectTransform.offsetMin = new Vector2(24, 0);
+            text.rectTransform.offsetMin = new Vector2(98, 0);
             text.rectTransform.offsetMax = new Vector2(-24, 0);
-            return new MilestoneRow { milestone = m, text = text };
+            return new MilestoneRow { milestone = m, text = text, icon = icon };
         }
     }
 }

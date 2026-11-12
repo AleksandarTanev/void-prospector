@@ -9,37 +9,30 @@ using VoidProspector.Idle;
 namespace VoidProspector.UI
 {
     /// <summary>
-    /// Greybox HUD. Top bar: credits, idle income per second, the sector (opens the Star Map) and depth controls.
-    /// Bottom panel: cargo bar, Sell, auto-sell threshold and the upgrades list.
+    /// The HUD. Top bar: credits, idle income per second, the sector and depth controls.
+    /// Bottom: a panel with the cargo bar, Sell, auto-sell and the upgrades list, and under it the tab bar
+    /// (Upgrades / Refinery / Codex / Map) that opens the dialogs.
     /// </summary>
     public class Hud : MonoBehaviour
     {
-        /// <summary>Panel heights in reference pixels (1080×1920). The world layout keeps the ship above the bottom panel.</summary>
+        /// <summary>Heights in reference pixels (1080×1920). The world layout keeps the ship above the bottom panel.</summary>
         public const float TopBarHeight = 200f;
-        public const float BottomPanelHeight = 640f;
+        public const float TabBarHeight = 150f;
+        const float BodyHeight = 560f;
+        public const float BottomPanelHeight = TabBarHeight + BodyHeight;
 
-        static readonly Color PanelColor = new Color(0f, 0f, 0f, 0.6f);
-        static readonly Color SellColor = new Color(0.18f, 0.5f, 0.3f);
-        static readonly Color ToggleColor = new Color(0.22f, 0.24f, 0.32f);
-        static readonly Color CreditsColor = new Color(1f, 0.9f, 0.5f);
-        static readonly Color CargoColor = new Color(0.5f, 0.85f, 1f);
         static readonly Color CargoFullColor = new Color(1f, 0.45f, 0.4f);
-        static readonly Color DepthColor = new Color(0.6f, 0.9f, 1f);
-        static readonly Color IdleColor = new Color(0.75f, 0.85f, 1f);
-        static readonly Color MapColor = new Color(0.22f, 0.24f, 0.32f);
-        static readonly Color MapReadyColor = new Color(0.65f, 0.5f, 0.15f);
-        static readonly Color JumpColor = new Color(1f, 0.8f, 0.4f);
 
         public RectTransform PopupLayer { get; private set; }
-        public TextMeshProUGUI Toast { get; private set; }
+        public ToastView Toast { get; private set; }
 
         GameRoot _root;
         GameSession Session => _root.Session;
 
         TextMeshProUGUI _credits, _idle, _sector, _depth, _cargoText, _sellLabel, _autoSellLabel;
-        Button _sell, _shallower, _deeper, _map;
-        Image _mapImage;
-        StarMapPanel _starMap;
+        UiButton _sell, _shallower, _deeper;
+        TabBar _tabs;
+        TabBar.Tab _mapTab;
         JumpState _jumpState;
         RectTransform _cargoFill, _depthFill;
         Image _cargoFillImage;
@@ -62,96 +55,120 @@ namespace VoidProspector.UI
             UiFactory.Stretch(PopupLayer);
 
             BuildTopBar(canvas);
-
-            Toast = UiFactory.Text(canvas, "Toast", "", 56, TextAlignmentOptions.Center, Color.white);
-            Toast.fontStyle = FontStyles.Bold;
-            UiFactory.AddOutline(Toast);
-            var trt = Toast.rectTransform;
-            UiFactory.Strip(trt, true, 90);
-            trt.offsetMin += new Vector2(0, -TopBarHeight - 20);
-            trt.offsetMax += new Vector2(0, -TopBarHeight - 20);
-
             BuildBottomPanel(canvas);
-
-            // Right edge, under the top bar: Codex, then Refinery (appears with Sector 3).
-            gameObject.AddComponent<CodexPanel>().Init(_root, canvas, 0);
-            gameObject.AddComponent<RefineryPanel>().Init(_root, canvas, 1);
+            BuildTabs(canvas);
             gameObject.AddComponent<ScannerView>().Init(_root, PopupLayer);
+
+            Toast = ToastView.Create(canvas, TopBarHeight + 24);
 
             if (Debug.isDebugBuild) gameObject.AddComponent<DebugPanel>().Init(_root, canvas);
         }
 
         void BuildTopBar(RectTransform canvas)
         {
-            var top = UiFactory.Panel("Top Bar", canvas, PanelColor).rectTransform;
+            var top = UiFactory.Rect("Top Bar", canvas);
             UiFactory.Strip(top, true, TopBarHeight);
 
-            _credits = UiFactory.Text(top, "Credits", "$ 0", 72, TextAlignmentOptions.Left, CreditsColor);
+            // The strip art has its bright edge on top; flip it so the edge faces the game.
+            var bg = UiFactory.Frame("Background", top, UiTheme.Strip, new Color(0f, 0f, 0f, 0.6f));
+            UiFactory.Stretch(bg.rectTransform);
+            bg.rectTransform.offsetMin = new Vector2(-8, 0);
+            bg.rectTransform.offsetMax = new Vector2(8, 8);
+            bg.rectTransform.localScale = new Vector3(1, -1, 1);
+
+            // Left: credits, and under them idle income (what auto-fire and drones earn per second with no input).
+            var coin = UiFactory.Icon(top, "Credits Icon", UiTheme.Icon("credits"), UiTheme.Credits);
+            UiFactory.Square(coin.rectTransform, Vector2.zero, new Vector2(78, 122), 76);
+            _credits = UiFactory.Text(top, "Credits", "0", 70, TextAlignmentOptions.Left, UiTheme.Credits);
             _credits.fontStyle = FontStyles.Bold;
-            UiFactory.PlaceFromBottom(_credits.rectTransform, 0f, 0.5f, 50, 120, 40);
+            UiFactory.PlaceFromBottom(_credits.rectTransform, 0f, 0.55f, 76, 92, 0);
+            _credits.rectTransform.offsetMin = new Vector2(130, 76);
 
-            // Idle income: what auto-fire and drones earn per second with no input (offline earnings use the same number).
-            _idle = UiFactory.Text(top, "Idle Income", "", 30, TextAlignmentOptions.Left, IdleColor);
-            UiFactory.PlaceFromBottom(_idle.rectTransform, 0f, 0.5f, 18, 44, 40);
+            var clock = UiFactory.Icon(top, "Idle Icon", UiTheme.Icon("idle"), UiTheme.Muted);
+            UiFactory.Square(clock.rectTransform, Vector2.zero, new Vector2(78, 46), 44);
+            _idle = UiFactory.Text(top, "Idle Income", "", 30, TextAlignmentOptions.Left, UiTheme.Muted);
+            UiFactory.PlaceFromBottom(_idle.rectTransform, 0f, 0.55f, 24, 44, 0);
+            _idle.rectTransform.offsetMin = new Vector2(130, 24);
 
-            _starMap = gameObject.AddComponent<StarMapPanel>();
-            _starMap.Init(_root);
-            _map = UiFactory.Button(top, "Map", MapColor, _starMap.Open, out _sector, 30);
-            _mapImage = (Image)_map.targetGraphic;
-            UiFactory.PlaceFromBottom((RectTransform)_map.transform, 0.5f, 1f, 136, 56, 24);
+            // Right: sector name, then  [^] Depth n/m [v]  with progress toward the next depth.
+            _sector = UiFactory.Text(top, "Sector", "", 28, TextAlignmentOptions.Center, UiTheme.Accent);
+            _sector.fontStyle = FontStyles.Bold;
+            _sector.characterSpacing = 3;
+            UiFactory.PlaceFromBottom(_sector.rectTransform, 0.55f, 1f, 140, 44, 20);
 
-            _shallower = UiFactory.Button(top, "Shallower", ToggleColor, () => Session.Depths.TrySetDepth(Session.Depth - 1), out var lessLabel, 44);
-            lessLabel.text = "<";
-            UiFactory.PlaceFromBottom((RectTransform)_shallower.transform, 0.5f, 0.6f, 40, 90, 8);
+            _shallower = UiFactory.IconButton(top, "Shallower", "up", () => Session.Depths.TrySetDepth(Session.Depth - 1));
+            UiFactory.Square((RectTransform)_shallower.transform, new Vector2(0.55f, 0), new Vector2(70, 76), 96);
 
-            _depth = UiFactory.Text(top, "Depth", "", 40, TextAlignmentOptions.Center, DepthColor);
+            _deeper = UiFactory.IconButton(top, "Deeper", "down", () => Session.Depths.TrySetDepth(Session.Depth + 1));
+            UiFactory.Square((RectTransform)_deeper.transform, new Vector2(1f, 0), new Vector2(-70, 76), 96);
+
+            _depth = UiFactory.Text(top, "Depth", "", 40, TextAlignmentOptions.Center, UiTheme.Text);
             _depth.fontStyle = FontStyles.Bold;
-            UiFactory.PlaceFromBottom(_depth.rectTransform, 0.6f, 0.9f, 52, 80, 0);
-
-            _deeper = UiFactory.Button(top, "Deeper", ToggleColor, () => Session.Depths.TrySetDepth(Session.Depth + 1), out var moreLabel, 44);
-            moreLabel.text = ">";
-            UiFactory.PlaceFromBottom((RectTransform)_deeper.transform, 0.9f, 1f, 40, 90, 8);
+            UiFactory.PlaceFromBottom(_depth.rectTransform, 0.55f, 1f, 70, 60, 130);
 
             // Progress toward unlocking the next depth.
-            var bg = UiFactory.Panel("Depth Progress", top, new Color(1, 1, 1, 0.12f)).rectTransform;
-            UiFactory.PlaceFromBottom(bg, 0.6f, 0.9f, 30, 12, 10);
-            _depthFill = UiFactory.Rect("Fill", bg);
-            _depthFill.anchorMin = Vector2.zero;
-            _depthFill.anchorMax = new Vector2(0, 1);
-            _depthFill.offsetMin = _depthFill.offsetMax = Vector2.zero;
-            _depthFill.gameObject.AddComponent<Image>().color = DepthColor;
+            var bar = UiFactory.Rect("Depth Progress", top);
+            UiFactory.PlaceFromBottom(bar, 0.55f, 1f, 34, 26, 130);
+            _depthFill = UiFactory.Bar(bar, "Bar", UiTheme.Accent, out _);
+            UiFactory.Stretch((RectTransform)_depthFill.parent);
         }
 
         void BuildBottomPanel(RectTransform canvas)
         {
-            var bottom = UiFactory.Panel("Bottom Panel", canvas, PanelColor).rectTransform;
-            UiFactory.Strip(bottom, false, BottomPanelHeight);
+            var bottom = UiFactory.Rect("Bottom Panel", canvas);
+            UiFactory.Strip(bottom, false, BodyHeight);
+            bottom.offsetMin = new Vector2(0, TabBarHeight);
+            bottom.offsetMax = new Vector2(0, TabBarHeight + BodyHeight);
 
-            _cargoText = UiFactory.Text(bottom, "Cargo", "", 36, TextAlignmentOptions.Left, Color.white);
-            UiFactory.PlaceFromBottom(_cargoText.rectTransform, 0f, 0.35f, 570, 56, 40);
+            var bg = UiFactory.Frame("Background", bottom, UiTheme.Panel, new Color(0f, 0f, 0f, 0.6f));
+            UiFactory.Stretch(bg.rectTransform);
+            bg.rectTransform.offsetMin = new Vector2(8, -10);
+            bg.rectTransform.offsetMax = new Vector2(-8, 0);
 
-            var cargoBg = UiFactory.Panel("Cargo Bar", bottom, new Color(1, 1, 1, 0.12f)).rectTransform;
-            UiFactory.PlaceFromBottom(cargoBg, 0.35f, 1f, 581, 34, 40);
-            _cargoFill = UiFactory.Rect("Fill", cargoBg);
-            _cargoFill.anchorMin = Vector2.zero;
-            _cargoFill.anchorMax = new Vector2(0, 1);
-            _cargoFill.offsetMin = _cargoFill.offsetMax = Vector2.zero;
-            _cargoFillImage = _cargoFill.gameObject.AddComponent<Image>();
-            _cargoFillImage.color = CargoColor;
+            // Cargo: icon, count, fill bar.
+            var crate = UiFactory.Icon(bottom, "Cargo Icon", UiTheme.Icon("cargo"), UiTheme.Text);
+            UiFactory.Square(crate.rectTransform, Vector2.zero, new Vector2(70, 502), 56);
+            _cargoText = UiFactory.Text(bottom, "Cargo", "", 34, TextAlignmentOptions.Left, UiTheme.Text);
+            _cargoText.fontStyle = FontStyles.Bold;
+            UiFactory.PlaceFromBottom(_cargoText.rectTransform, 0f, 0.4f, 474, 56, 0);
+            _cargoText.rectTransform.offsetMin = new Vector2(112, 474);
 
-            _sell = UiFactory.Button(bottom, "Sell", SellColor, OnSell, out _sellLabel, 52);
-            _sellLabel.fontStyle = FontStyles.Bold;
-            UiFactory.PlaceFromBottom((RectTransform)_sell.transform, 0f, 0.7f, 440, 115, 30);
-            ((RectTransform)_sell.transform).offsetMin = new Vector2(40, 440);
+            var cargoBar = UiFactory.Rect("Cargo Bar", bottom);
+            UiFactory.PlaceFromBottom(cargoBar, 0.4f, 1f, 484, 36, 40);
+            _cargoFill = UiFactory.Bar(cargoBar, "Bar", UiTheme.Accent, out _cargoFillImage);
+            UiFactory.Stretch((RectTransform)_cargoFill.parent);
 
-            var autoSell = UiFactory.Button(bottom, "Auto-sell", ToggleColor, OnCycleAutoSell, out _autoSellLabel, 30);
-            UiFactory.PlaceFromBottom((RectTransform)autoSell.transform, 0.7f, 1f, 440, 115, 0);
-            ((RectTransform)autoSell.transform).offsetMax = new Vector2(-40, 555);
+            _sell = UiFactory.Button(bottom, "Sell", ButtonStyle.Confirm, OnSell, out _sellLabel, 48);
+            UiFactory.PlaceFromBottom((RectTransform)_sell.transform, 0f, 0.68f, 352, 112, 0);
+            ((RectTransform)_sell.transform).offsetMin = new Vector2(32, 352);
+            ((RectTransform)_sell.transform).offsetMax = new Vector2(-8, 464);
+
+            var autoSell = UiFactory.Button(bottom, "Auto-sell", ButtonStyle.Secondary, OnCycleAutoSell, out _autoSellLabel, 30);
+            UiFactory.PlaceFromBottom((RectTransform)autoSell.transform, 0.68f, 1f, 352, 112, 0);
+            ((RectTransform)autoSell.transform).offsetMin = new Vector2(8, 352);
+            ((RectTransform)autoSell.transform).offsetMax = new Vector2(-32, 464);
 
             var list = UiFactory.Rect("Upgrades", bottom);
-            UiFactory.PlaceFromBottom(list, 0f, 1f, 16, 410, 40);
+            UiFactory.PlaceFromBottom(list, 0f, 1f, 14, 326, 32);
             _upgrades = gameObject.AddComponent<UpgradePanel>();
             _upgrades.Init(_root, list);
+        }
+
+        void BuildTabs(RectTransform canvas)
+        {
+            var starMap = gameObject.AddComponent<StarMapPanel>();
+            starMap.Init(_root);
+            var codex = gameObject.AddComponent<CodexPanel>();
+            codex.Init(_root);
+            var refinery = gameObject.AddComponent<RefineryPanel>();
+
+            _tabs = gameObject.AddComponent<TabBar>();
+            _tabs.Init(canvas, TabBarHeight);
+            _tabs.Add("Upgrades", "upgrades", null);
+            var refineryTab = _tabs.Add("Refinery", "refinery", refinery);
+            _tabs.Add("Codex", "codex", codex);
+            _mapTab = _tabs.Add("Map", "map", starMap);
+            refinery.Init(_root, refineryTab);
         }
 
         void OnSell()
@@ -165,11 +182,11 @@ namespace VoidProspector.UI
             if (value <= GameNumber.Zero)
             {
                 _root.Audio.Deny();
-                _root.Fx.Toast("Keeping these for the jump drive", JumpColor);
+                _root.Fx.Toast("Keeping these for the jump drive", UiTheme.Gold);
                 return;
             }
             _root.Audio.Sell();
-            _root.Fx.Toast($"+$ {NumberFormatter.Format(value)}", CreditsColor);
+            _root.Fx.Toast($"+$ {NumberFormatter.Format(value)}", UiTheme.Credits);
             _root.Fx.Burst(_root.Ship.position, new Color(1f, 0.85f, 0.3f), 30, 6f, 0.2f);
         }
 
@@ -190,7 +207,7 @@ namespace VoidProspector.UI
             var cargo = Session.Cargo;
             var depths = Session.Depths;
 
-            _sector.text = $"{Session.Sector.index}. {Session.Sector.displayName}  <size=24>MAP</size>";
+            _sector.text = $"{Session.Sector.index}. {Session.Sector.displayName.ToUpperInvariant()}";
 
             BindJumpDrive();
             BindIdleIncome();
@@ -198,13 +215,13 @@ namespace VoidProspector.UI
             Session.Milestones.Completed
                 .Subscribe(m =>
                 {
-                    _root.Fx.Toast($"Milestone: {m.Title}!\n<size=38>{m.RewardText}</size>", JumpColor);
+                    _root.Fx.Toast($"Milestone: {m.Title}!\n<size=34>{m.RewardText}</size>", UiTheme.Gold);
                     _root.Audio.Rare(2);
                 })
                 .AddTo(this);
 
             Session.Wallet.CreditsRx
-                .Subscribe(credits => _credits.text = "$ " + NumberFormatter.Format(credits))
+                .Subscribe(credits => _credits.text = NumberFormatter.Format(credits))
                 .AddTo(this);
 
             Observable.Merge(depths.CurrentRx, depths.DeepestRx, depths.ProgressRx)
@@ -222,34 +239,28 @@ namespace VoidProspector.UI
 
             Session.AutoSellBelowRx
                 .Subscribe(below => _autoSellLabel.text = below == 0
-                    ? "Auto-sell\n<size=26>off</size>"
-                    : $"Auto-sell\n<size=26>below {Session.Purity[below].name}</size>")
+                    ? "AUTO-SELL\n<size=24><color=#9FB8DB>off</color></size>"
+                    : $"AUTO-SELL\n<size=24>below {Session.Purity[below].name}</size>")
                 .AddTo(this);
         }
 
         /// <summary>
-        /// The map button turns gold when the jump drive can be bought; toasts announce when it becomes available
+        /// The Map tab turns gold when the jump drive can be bought; toasts announce when it becomes available
         /// (minerals are kept from then on) and when it's affordable.
         /// </summary>
         void BindJumpDrive()
         {
             var cargo = Session.Cargo;
-            Observable.Merge(Session.Wallet.CreditsRx.AsUnitObservable(), cargo.CountRx.AsUnitObservable(),
+            var jumpState = Observable.Merge(Session.Wallet.CreditsRx.AsUnitObservable(), cargo.CountRx.AsUnitObservable(),
                     Session.Depths.DeepestRx.AsUnitObservable(), Session.UnlockedSectorRx.AsUnitObservable())
                 .Select(_ => Session.JumpState)
-                .DistinctUntilChanged()
-                .Subscribe(state => _mapImage.color = state == JumpState.Affordable ? MapReadyColor : MapColor)
-                .AddTo(this);
+                .DistinctUntilChanged();
+
+            jumpState.Subscribe(state => _mapTab.SetAlert(state == JumpState.Affordable)).AddTo(this);
 
             // Skip the state at startup so loading a save doesn't toast.
             _jumpState = Session.JumpState;
-            Observable.Merge(Session.Wallet.CreditsRx.AsUnitObservable(), cargo.CountRx.AsUnitObservable(),
-                    Session.Depths.DeepestRx.AsUnitObservable(), Session.UnlockedSectorRx.AsUnitObservable())
-                .Select(_ => Session.JumpState)
-                .DistinctUntilChanged()
-                .Skip(1)
-                .Subscribe(OnJumpStateChanged)
-                .AddTo(this);
+            jumpState.Skip(1).Subscribe(OnJumpStateChanged).AddTo(this);
         }
 
         void OnJumpStateChanged(JumpState state)
@@ -259,9 +270,9 @@ namespace VoidProspector.UI
             var next = Session.NextSector;
             if (next == null) return;
             if (state == JumpState.Affordable)
-                _root.Fx.Toast("Jump drive ready! Open the MAP", JumpColor);
+                _root.Fx.Toast("Jump drive ready! Open the MAP", UiTheme.Gold);
             else if (state == JumpState.Saving && previous == JumpState.NeedsDepth)
-                _root.Fx.Toast($"Jump drive to {next.displayName} available: see the MAP", JumpColor);
+                _root.Fx.Toast($"Jump drive to {next.displayName} available: see the MAP", UiTheme.Gold);
         }
 
         /// <summary>
@@ -288,13 +299,13 @@ namespace VoidProspector.UI
                 return;
             }
             double rate = OfflineEarnings.EstimateIncomePerSecond(Session, Session.Database.offline.incomeSampleSeconds);
-            _idle.text = $"Idle  $ {NumberFormatter.Format(rate)}/s";
+            _idle.text = $"{NumberFormatter.Format(rate)}/s idle";
         }
 
         void DrawDepth()
         {
             var depths = Session.Depths;
-            _depth.text = $"Depth {depths.Current + 1}<size=26>/{depths.MaxDepth}</size>";
+            _depth.text = $"DEPTH {depths.Current + 1}<size=26><color=#9FB8DB>/{depths.MaxDepth}</color></size>";
             _shallower.interactable = depths.CanGoShallower;
             _deeper.interactable = depths.CanGoDeeper;
             _depthFill.anchorMax = new Vector2(depths.ProgressFraction, 1);
@@ -303,16 +314,16 @@ namespace VoidProspector.UI
         void DrawCargo()
         {
             var cargo = Session.Cargo;
-            _cargoText.text = $"Cargo {cargo.Count}/{cargo.Capacity}";
+            _cargoText.text = $"{cargo.Count}<size=26><color=#9FB8DB>/{cargo.Capacity}</color></size>";
             _cargoFill.anchorMax = new Vector2(cargo.Fill, 1);
-            _cargoFillImage.color = cargo.IsFull ? CargoFullColor : CargoColor;
+            _cargoFillImage.color = cargo.IsFull ? CargoFullColor : UiTheme.Accent;
         }
 
         void DrawSell()
         {
             var cargo = Session.Cargo;
             var reserve = Session.JumpReserve;
-            string keep = reserve.Count > 0 ? $"\n<size=24>keeps {reserve[0].count} {reserve[0].mineral.displayName} for the jump drive</size>" : "";
+            string keep = reserve.Count > 0 ? $"\n<size=22>keeps {reserve[0].count} {reserve[0].mineral.displayName} for the jump drive</size>" : "";
             _sellLabel.text = cargo.IsEmpty ? "SELL" : $"SELL  $ {NumberFormatter.Format(Session.SellableValue)}{keep}";
             _sell.interactable = !cargo.IsEmpty;
         }

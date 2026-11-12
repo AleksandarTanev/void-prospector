@@ -18,19 +18,15 @@ namespace VoidProspector.UI
     public class UpgradePanel : MonoBehaviour
     {
         const float HeaderHeight = 64f;
-        const float RowHeight = 108f;
-        const float RowSpacing = 10f;
-
-        static readonly Color RowColor = new Color(1f, 1f, 1f, 0.06f);
-        static readonly Color BuyColor = new Color(0.16f, 0.36f, 0.56f);
-        static readonly Color ToggleColor = new Color(0.22f, 0.24f, 0.32f);
+        const float RowHeight = 104f;
+        const float RowSpacing = 8f;
 
         class Row
         {
             public UpgradeTrack track;
             public GameObject root;
             public TextMeshProUGUI info;
-            public Button buy;
+            public UiButton buy;
             public TextMeshProUGUI buyLabel;
         }
 
@@ -50,74 +46,48 @@ namespace VoidProspector.UI
 
         void Build(RectTransform area)
         {
-            var title = UiFactory.Text(area, "Title", "UPGRADES", 34, TextAlignmentOptions.Left, new Color(0.75f, 0.85f, 1f));
+            var title = UiFactory.Text(area, "Title", "UPGRADES", 32, TextAlignmentOptions.Left, UiTheme.Accent);
             title.fontStyle = FontStyles.Bold;
+            title.characterSpacing = 4;
             var trt = title.rectTransform;
             trt.anchorMin = new Vector2(0, 1);
             trt.anchorMax = new Vector2(0.6f, 1);
             trt.pivot = new Vector2(0, 1);
-            trt.offsetMin = new Vector2(0, -HeaderHeight);
+            trt.offsetMin = new Vector2(8, -HeaderHeight);
             trt.offsetMax = Vector2.zero;
 
-            var mode = UiFactory.Button(area, "Buy Mode", ToggleColor, OnCycleMode, out _modeLabel, 32);
+            var mode = UiFactory.Button(area, "Buy Mode", ButtonStyle.Secondary, OnCycleMode, out _modeLabel, 28);
             var mrt = (RectTransform)mode.transform;
             mrt.anchorMin = new Vector2(0.72f, 1);
             mrt.anchorMax = new Vector2(1, 1);
             mrt.pivot = new Vector2(1, 1);
-            mrt.offsetMin = new Vector2(0, -HeaderHeight + 6);
+            mrt.offsetMin = new Vector2(0, -HeaderHeight + 4);
             mrt.offsetMax = new Vector2(0, -2);
 
-            // Scroll view
-            var view = UiFactory.Rect("Scroll View", area);
-            view.anchorMin = Vector2.zero;
-            view.anchorMax = Vector2.one;
-            view.offsetMin = Vector2.zero;
-            view.offsetMax = new Vector2(0, -HeaderHeight - 8);
-            view.gameObject.AddComponent<Image>().color = new Color(0, 0, 0, 0.01f);   // receives drags
-            view.gameObject.AddComponent<RectMask2D>();
-
-            var content = UiFactory.Rect("Content", view);
-            content.anchorMin = new Vector2(0, 1);
-            content.anchorMax = new Vector2(1, 1);
-            content.pivot = new Vector2(0.5f, 1);
-            content.offsetMin = content.offsetMax = Vector2.zero;
-            var layout = content.gameObject.AddComponent<VerticalLayoutGroup>();
-            layout.spacing = RowSpacing;
-            layout.childControlHeight = true;
-            layout.childControlWidth = true;
-            layout.childForceExpandHeight = false;
-            layout.childForceExpandWidth = true;
-            content.gameObject.AddComponent<ContentSizeFitter>().verticalFit = ContentSizeFitter.FitMode.PreferredSize;
-
-            var scroll = view.gameObject.AddComponent<ScrollRect>();
-            scroll.content = content;
-            scroll.viewport = view;
-            scroll.horizontal = false;
-            scroll.movementType = ScrollRect.MovementType.Clamped;
-            scroll.scrollSensitivity = 30;
-
+            var content = UiFactory.ScrollList(area, Vector2.zero, new Vector2(0, -HeaderHeight - 8), RowSpacing);
             foreach (var track in Session.Upgrades.All) _rows.Add(BuildRow(content, track));
         }
 
         Row BuildRow(RectTransform content, UpgradeTrack track)
         {
-            var bg = UiFactory.Panel(track.Definition.id, content, RowColor);
-            bg.gameObject.AddComponent<LayoutElement>().preferredHeight = RowHeight;
-            var rt = bg.rectTransform;
+            var rt = UiFactory.ListRow(content, track.Definition.id, RowHeight);
 
-            var info = UiFactory.Text(rt, "Info", "", 34, TextAlignmentOptions.Left, Color.white);
+            var icon = UiFactory.Icon(rt, "Icon", UiTheme.UpgradeIcon(track.Definition.id), UiTheme.Accent);
+            UiFactory.Square(icon.rectTransform, new Vector2(0, 0.5f), new Vector2(58, 0), 64);
+
+            var info = UiFactory.Text(rt, "Info", "", 32, TextAlignmentOptions.Left, UiTheme.Text);
             info.rectTransform.anchorMin = Vector2.zero;
             info.rectTransform.anchorMax = new Vector2(0.62f, 1);
-            info.rectTransform.offsetMin = new Vector2(24, 0);
+            info.rectTransform.offsetMin = new Vector2(106, 0);
             info.rectTransform.offsetMax = Vector2.zero;
 
-            var row = new Row { track = track, root = bg.gameObject, info = info };
-            row.buy = UiFactory.Button(rt, "Buy", BuyColor, () => OnBuy(row), out row.buyLabel, 34);
+            var row = new Row { track = track, root = rt.gameObject, info = info };
+            row.buy = UiFactory.Button(rt, "Buy", ButtonStyle.Primary, () => OnBuy(row), out row.buyLabel, 32);
             var brt = (RectTransform)row.buy.transform;
             brt.anchorMin = new Vector2(0.62f, 0);
             brt.anchorMax = Vector2.one;
-            brt.offsetMin = new Vector2(10, 10);
-            brt.offsetMax = new Vector2(-10, -10);
+            brt.offsetMin = new Vector2(8, 10);
+            brt.offsetMax = new Vector2(-12, -10);
             return row;
         }
 
@@ -146,7 +116,7 @@ namespace VoidProspector.UI
         /// </summary>
         void Bind()
         {
-            _mode.Subscribe(m => _modeLabel.text = m == BuyMode.One ? "Buy ×1" : m == BuyMode.Ten ? "Buy ×10" : "Buy MAX")
+            _mode.Subscribe(m => _modeLabel.text = m == BuyMode.One ? "BUY ×1" : m == BuyMode.Ten ? "BUY ×10" : "BUY MAX")
                 .AddTo(this);
 
             var credits = Session.Wallet.CreditsRx;
@@ -168,7 +138,8 @@ namespace VoidProspector.UI
         {
             var t = row.track;
             string next = t.IsMaxed ? "" : $" → {Describe(t.Effect, t.NextValue)}";
-            row.info.text = $"<b>{t.Definition.displayName}</b>  <size=26>Lv {t.Level}</size>\n<size=26>{Describe(t.Effect, t.Value)}{next}</size>";
+            row.info.text = $"<b>{t.Definition.displayName}</b>  <size=24><color=#4FD8FF>Lv {t.Level}</color></size>\n" +
+                            $"<size=25><color=#9FB8DB>{Describe(t.Effect, t.Value)}{next}</color></size>";
         }
 
         static void DrawBuy(Row row, UpgradeQuote quote)

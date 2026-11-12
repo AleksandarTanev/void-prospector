@@ -37,12 +37,16 @@ Assets/_Project/
     Idle/        OfflineEarnings (pure), OfflineController
     Analytics/   AnalyticsEvent, GameAnalytics, JsonLinesSink (pure) + AnalyticsController
     Fx/          GameFx (particles, shake, hit-stop, popups, toasts), GameAudio (generated sounds), ShapeSprites
-    UI/          Hud, UpgradePanel, StarMapPanel, RefineryPanel, CodexPanel, ScannerView, WelcomeBackPopup, DebugPanel,
-                 UiFactory (incl. Modal and ScrollList helpers for dialogs)
-    Editor/      VoidProspector.Editor.asmdef — EconomyExport, PlaytestTools (Pacing Report, Open Save and Analytics Folder) menus
+    UI/          Hud, TabBar, UpgradePanel, StarMapPanel, RefineryPanel, CodexPanel, ScannerView, WelcomeBackPopup, ToastView,
+                 DebugPanel, UiFactory (incl. Modal and ScrollList helpers for dialogs), UiTheme, UiButton
+    Editor/      VoidProspector.Editor.asmdef — EconomyExport, PlaytestTools (Pacing Report, Open Save and Analytics Folder) menus,
+                 UiSpriteImporter (import settings + 9-slice borders for Resources/UI)
+  Resources/UI/            Frames/, Icons/, Minerals/ — UI sprites cut from art/ui-source/ by tools/ui/slice_ui.py
 Assets/Tests/EditMode/     VoidProspector.Tests.EditMode.asmdef (179 tests)
 tools/economy/             build_economy_xlsx.py
 tools/analytics/           summarize.py (playtest logs → pacing report)
+tools/ui/                  slice_ui.py (sprite sheets → Resources/UI)
+art/ui-source/             generated UI sprite sheets (outside Assets; prompts in docs/ui/ART_PROMPTS.md)
 ```
 
 Rules that keep this working:
@@ -86,6 +90,15 @@ Rules that keep this working:
 - New gameplay systems: add their events in `GameAnalytics` (subscribe to the model's observables), not in MonoBehaviours. Analytics must never throw into gameplay.
 - `tools/analytics/summarize.py` reads testers' logs; keep event and param names stable or update the script.
 - In the editor the save lives in `Application.persistentDataPath` too, so play sessions carry over. Use the debug panel's **Wipe save** for a fresh start and **Away 1h / 10h** to test offline earnings.
+
+## UI look (Phase 9)
+
+- Sci-fi theme from generated art: dark navy 9-sliced frames with cyan edges, white icons tinted in code, low-poly mineral icons. Palette and sprite lookup in `UiTheme`; never hard-code a new colour in a panel if a theme colour fits.
+- Art pipeline: sheets in `art/ui-source/` (`ui_frames.png`, `ui_icons.png`, `ui_minerals.png`) → `python tools/ui/slice_ui.py art/ui-source Assets/_Project/Resources/UI` → one PNG per element. The frames sheet is cut by finding separate blobs in reading order (`FRAME_NAMES`); icons and minerals by grid. If a sheet is regenerated, check the names and order still match. The script also writes `bar_fill_white` (a tintable copy of the bar fill).
+- `UiSpriteImporter` sets sprite import settings and the 9-slice borders (table in the file). After changing a border: **Void Prospector → Reimport UI Sprites**.
+- Build UI only through `UiFactory`: `Frame` (sliced sprite, flat-colour fallback if missing), `Button(..., ButtonStyle, ...)` → `UiButton` (style sprite, disabled frame, press squash; change `Style` at runtime instead of tinting), `IconButton`, `Icon`, `Bar` (track + tinted fill, set `fill.anchorMax.x`), `ListRow`, `ListHeader`, `Modal`.
+- Layout: top bar (`Hud.TopBarHeight`), bottom panel (cargo, Sell, auto-sell, upgrades) above the tab bar (`Hud.TabBarHeight`); `Hud.BottomPanelHeight` is both, and the ship sits above it. Tabs: Upgrades (home) / Refinery / Codex / Map. Dialogs opened by a tab implement `ITabPage` (`IsOpenRx`, `Open`, `Close`) and are `UiFactory.Modal(..., aboveTabBar: true, ...)` so the tabs stay tappable; the tab highlight follows `IsOpenRx`. Tabs can be `locked` (with an `onLocked` action) and `SetAlert` (gold).
+- Toasts go through `GameFx.Toast` → `ToastView` (one at a time, framed, DOTween slide + fade in unscaled time).
 
 ## TextMeshPro
 
