@@ -353,6 +353,7 @@ Median gaps after minute 5 stay below the GDD's (10 s in minutes 5–15 against 
 - [ ] Each mineral gets one distinct colour; purity glow and particle tiers
 - [ ] Audio: ambient track, hit and crack sounds, a pickup sound per mineral, a rare-drop sting
 - [ ] UI pass: top bar, bottom tab panel, toasts — built, not yet checked in Unity (branch `phase-9-ui-visuals`): generated sci-fi frames, icons and mineral icons (`docs/ui/ART_PROMPTS.md`, sliced by `tools/ui/slice_ui.py`); themed buttons with press squash; tab bar Upgrades / Refinery / Codex / Map replacing the Map, Codex and Refine buttons; dialogs open above the tab bar with a title plate and an X; framed toasts that slide in
+  - Upgrades moved out of the bottom panel into their own tab dialog (credits, buy mode, full-height list); the bottom panel is now only cargo, Sell and auto-sell, so the play area is taller. The Upgrades tab turns gold when something is affordable; no tab is highlighted while no dialog is open
   - Open: a sci-fi display font (needs a TMP font asset made in Unity); credits counting up and coin cascade on Sell (feel pass); check on a real phone that 9-slice borders and text sizes read well
 - [ ] Feel pass: hit-stop on big cracks, slow-motion beat on Flawless drops, coin cascade on selling
 - [ ] Performance check on a cheap Android phone: steady 60 FPS, no stutter from creating objects

@@ -12,12 +12,13 @@ using VoidProspector.Economy;
 namespace VoidProspector.UI
 {
     /// <summary>
-    /// Scrolling list of upgrade tracks with a ×1 / ×10 / MAX buy-mode toggle. Tracks tied to a later sector
-    /// (drones) appear once that sector is unlocked.
+    /// The Upgrades dialog (opened by the Upgrades tab): credits, a ×1 / ×10 / MAX buy-mode toggle and a scrolling
+    /// list of upgrade tracks. Tracks tied to a later sector (drones) appear once that sector is unlocked.
+    /// <see cref="AnyAffordable"/> tells the HUD when something can be bought, so the tab can light up while closed.
     /// </summary>
-    public class UpgradePanel : MonoBehaviour
+    public class UpgradePanel : MonoBehaviour, ITabPage
     {
-        const float HeaderHeight = 64f;
+        const float HeaderHeight = 72f;
         const float RowHeight = 104f;
         const float RowSpacing = 8f;
 
@@ -34,27 +35,57 @@ namespace VoidProspector.UI
         GameSession Session => _root.Session;
         readonly List<Row> _rows = new List<Row>();
         readonly ReactiveProperty<BuyMode> _mode = new ReactiveProperty<BuyMode>(BuyMode.One);
-        TextMeshProUGUI _modeLabel;
+        readonly ReactiveProperty<bool> _open = new ReactiveProperty<bool>(false);
+        TextMeshProUGUI _modeLabel, _credits;
+        RectTransform _canvas;
 
-        public void Init(GameRoot root, RectTransform area)
+        public ReadOnlyReactiveProperty<bool> IsOpenRx => _open;
+
+        /// <summary>True while any available, non-maxed upgrade can buy at least one level. Emits on subscribe, then on changes.</summary>
+        public Observable<bool> AnyAffordable { get; private set; }
+
+        public void Init(GameRoot root)
         {
             _root = root;
             _mode.AddTo(this);
-            Build(area);
+            _open.AddTo(this);
+            Build();
+            _canvas.gameObject.SetActive(false);
             Bind();
         }
 
-        void Build(RectTransform area)
+        void OnDestroy()
         {
-            var title = UiFactory.Text(area, "Title", "UPGRADES", 32, TextAlignmentOptions.Left, UiTheme.Accent);
-            title.fontStyle = FontStyles.Bold;
-            title.characterSpacing = 4;
-            var trt = title.rectTransform;
-            trt.anchorMin = new Vector2(0, 1);
-            trt.anchorMax = new Vector2(0.6f, 1);
-            trt.pivot = new Vector2(0, 1);
-            trt.offsetMin = new Vector2(8, -HeaderHeight);
-            trt.offsetMax = Vector2.zero;
+            if (_canvas != null) Destroy(_canvas.gameObject);
+        }
+
+        public void Open()
+        {
+            _canvas.gameObject.SetActive(true);
+            _open.Value = true;
+        }
+
+        public void Close()
+        {
+            _canvas.gameObject.SetActive(false);
+            _open.Value = false;
+        }
+
+        void Build()
+        {
+            var area = UiFactory.Modal("Upgrades", "UPGRADES", 89, true, Close, out _canvas);
+
+            // Header: credits (the dialog covers the top bar), then the buy-mode toggle.
+            var coin = UiFactory.Icon(area, "Credits Icon", UiTheme.Icon("credits"), UiTheme.Credits);
+            UiFactory.Square(coin.rectTransform, new Vector2(0, 1), new Vector2(32, -HeaderHeight / 2), 52);
+            _credits = UiFactory.Text(area, "Credits", "", 44, TextAlignmentOptions.Left, UiTheme.Credits);
+            _credits.fontStyle = FontStyles.Bold;
+            var crt = _credits.rectTransform;
+            crt.anchorMin = new Vector2(0, 1);
+            crt.anchorMax = new Vector2(0.7f, 1);
+            crt.pivot = new Vector2(0, 1);
+            crt.offsetMin = new Vector2(70, -HeaderHeight);
+            crt.offsetMax = Vector2.zero;
 
             var mode = UiFactory.Button(area, "Buy Mode", ButtonStyle.Secondary, OnCycleMode, out _modeLabel, 28);
             var mrt = (RectTransform)mode.transform;
@@ -120,6 +151,14 @@ namespace VoidProspector.UI
                 .AddTo(this);
 
             var credits = Session.Wallet.CreditsRx;
+            credits.Subscribe(c => _credits.text = "$ " + NumberFormatter.Format(c)).AddTo(this);
+
+            var changes = new List<Observable<Unit>> { credits.AsUnitObservable(), Session.UnlockedSectorRx.AsUnitObservable() };
+            foreach (var row in _rows) changes.Add(row.track.LevelRx.AsUnitObservable());
+            AnyAffordable = Observable.Merge(changes.ToArray())
+                .Select(_ => ComputeAnyAffordable())
+                .DistinctUntilChanged();
+
             foreach (var row in _rows)
             {
                 var r = row;
@@ -132,6 +171,17 @@ namespace VoidProspector.UI
                     .Subscribe(q => DrawBuy(r, q))
                     .AddTo(this);
             }
+        }
+
+        bool ComputeAnyAffordable()
+        {
+            var credits = Session.Wallet.Credits;
+            foreach (var row in _rows)
+            {
+                var t = row.track;
+                if (!t.IsMaxed && Session.IsAvailable(t) && t.Quote(BuyMode.One, credits).affordable) return true;
+            }
+            return false;
         }
 
         static void DrawInfo(Row row)

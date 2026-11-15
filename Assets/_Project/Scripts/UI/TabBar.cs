@@ -8,7 +8,7 @@ using UnityEngine.UI;
 
 namespace VoidProspector.UI
 {
-    /// <summary>A dialog the tab bar opens: Star Map, Refinery, Codex.</summary>
+    /// <summary>A dialog the tab bar opens: Upgrades, Refinery, Codex, Star Map.</summary>
     public interface ITabPage
     {
         ReadOnlyReactiveProperty<bool> IsOpenRx { get; }
@@ -17,9 +17,10 @@ namespace VoidProspector.UI
     }
 
     /// <summary>
-    /// The row of tabs along the bottom of the HUD. The first tab is "home" (no dialog open: the upgrades list);
-    /// the others open their page as a dialog above the bar. Only one page is open at a time, and the highlighted
-    /// tab follows whichever page is open, however it was closed.
+    /// The row of tabs along the bottom of the HUD. Each tab opens its page as a dialog above the bar; tapping the
+    /// open tab again closes it. A tab with no page (optional) acts as "home": it closes any open page and is
+    /// highlighted while nothing is open. Only one page is open at a time, and the highlighted tab follows whichever
+    /// page is open, however it was closed.
     /// </summary>
     public class TabBar : MonoBehaviour
     {
@@ -63,7 +64,7 @@ namespace VoidProspector.UI
             _bar.offsetMax = new Vector2(8, height);
         }
 
-        /// <summary>Adds a tab; <paramref name="page"/> null makes it the home tab (closes any open page).</summary>
+        /// <summary>Adds a tab; <paramref name="page"/> null makes it a home tab (closes any open page).</summary>
         public Tab Add(string label, string icon, ITabPage page)
         {
             var tab = new Tab { page = page };
@@ -136,7 +137,9 @@ namespace VoidProspector.UI
 
         void RefreshSelection()
         {
-            int selected = 0;
+            int selected = -1;   // nothing open: no tab highlighted (or the home tab, if there is one)
+            for (int i = 0; i < _tabs.Count; i++)
+                if (_tabs[i].page == null) { selected = i; break; }
             for (int i = 0; i < _tabs.Count; i++)
                 if (_tabs[i].page != null && _tabs[i].page.IsOpenRx.CurrentValue) { selected = i; break; }
             if (selected == _selected) return;

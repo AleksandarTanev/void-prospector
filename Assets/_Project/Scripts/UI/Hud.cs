@@ -10,7 +10,7 @@ namespace VoidProspector.UI
 {
     /// <summary>
     /// The HUD. Top bar: credits, idle income per second, the sector and depth controls.
-    /// Bottom: a panel with the cargo bar, Sell, auto-sell and the upgrades list, and under it the tab bar
+    /// Bottom: a short panel with the cargo bar, Sell and auto-sell, and under it the tab bar
     /// (Upgrades / Refinery / Codex / Map) that opens the dialogs.
     /// </summary>
     public class Hud : MonoBehaviour
@@ -18,7 +18,7 @@ namespace VoidProspector.UI
         /// <summary>Heights in reference pixels (1080×1920). The world layout keeps the ship above the bottom panel.</summary>
         public const float TopBarHeight = 200f;
         public const float TabBarHeight = 150f;
-        const float BodyHeight = 560f;
+        const float BodyHeight = 200f;
         public const float BottomPanelHeight = TabBarHeight + BodyHeight;
 
         static readonly Color CargoFullColor = new Color(1f, 0.45f, 0.4f);
@@ -36,7 +36,6 @@ namespace VoidProspector.UI
         JumpState _jumpState;
         RectTransform _cargoFill, _depthFill;
         Image _cargoFillImage;
-        UpgradePanel _upgrades;
 
         public void Init(GameRoot root)
         {
@@ -127,31 +126,26 @@ namespace VoidProspector.UI
 
             // Cargo: icon, count, fill bar.
             var crate = UiFactory.Icon(bottom, "Cargo Icon", UiTheme.Icon("cargo"), UiTheme.Text);
-            UiFactory.Square(crate.rectTransform, Vector2.zero, new Vector2(70, 502), 56);
+            UiFactory.Square(crate.rectTransform, Vector2.zero, new Vector2(70, 160), 56);
             _cargoText = UiFactory.Text(bottom, "Cargo", "", 34, TextAlignmentOptions.Left, UiTheme.Text);
             _cargoText.fontStyle = FontStyles.Bold;
-            UiFactory.PlaceFromBottom(_cargoText.rectTransform, 0f, 0.4f, 474, 56, 0);
-            _cargoText.rectTransform.offsetMin = new Vector2(112, 474);
+            UiFactory.PlaceFromBottom(_cargoText.rectTransform, 0f, 0.4f, 132, 56, 0);
+            _cargoText.rectTransform.offsetMin = new Vector2(112, 132);
 
             var cargoBar = UiFactory.Rect("Cargo Bar", bottom);
-            UiFactory.PlaceFromBottom(cargoBar, 0.4f, 1f, 484, 36, 40);
+            UiFactory.PlaceFromBottom(cargoBar, 0.4f, 1f, 142, 36, 40);
             _cargoFill = UiFactory.Bar(cargoBar, "Bar", UiTheme.Accent, out _cargoFillImage);
             UiFactory.Stretch((RectTransform)_cargoFill.parent);
 
             _sell = UiFactory.Button(bottom, "Sell", ButtonStyle.Confirm, OnSell, out _sellLabel, 48);
-            UiFactory.PlaceFromBottom((RectTransform)_sell.transform, 0f, 0.68f, 352, 112, 0);
-            ((RectTransform)_sell.transform).offsetMin = new Vector2(32, 352);
-            ((RectTransform)_sell.transform).offsetMax = new Vector2(-8, 464);
+            UiFactory.PlaceFromBottom((RectTransform)_sell.transform, 0f, 0.68f, 14, 112, 0);
+            ((RectTransform)_sell.transform).offsetMin = new Vector2(32, 14);
+            ((RectTransform)_sell.transform).offsetMax = new Vector2(-8, 126);
 
             var autoSell = UiFactory.Button(bottom, "Auto-sell", ButtonStyle.Secondary, OnCycleAutoSell, out _autoSellLabel, 30);
-            UiFactory.PlaceFromBottom((RectTransform)autoSell.transform, 0.68f, 1f, 352, 112, 0);
-            ((RectTransform)autoSell.transform).offsetMin = new Vector2(8, 352);
-            ((RectTransform)autoSell.transform).offsetMax = new Vector2(-32, 464);
-
-            var list = UiFactory.Rect("Upgrades", bottom);
-            UiFactory.PlaceFromBottom(list, 0f, 1f, 14, 326, 32);
-            _upgrades = gameObject.AddComponent<UpgradePanel>();
-            _upgrades.Init(_root, list);
+            UiFactory.PlaceFromBottom((RectTransform)autoSell.transform, 0.68f, 1f, 14, 112, 0);
+            ((RectTransform)autoSell.transform).offsetMin = new Vector2(8, 14);
+            ((RectTransform)autoSell.transform).offsetMax = new Vector2(-32, 126);
         }
 
         void BuildTabs(RectTransform canvas)
@@ -161,10 +155,13 @@ namespace VoidProspector.UI
             var codex = gameObject.AddComponent<CodexPanel>();
             codex.Init(_root);
             var refinery = gameObject.AddComponent<RefineryPanel>();
+            var upgrades = gameObject.AddComponent<UpgradePanel>();
+            upgrades.Init(_root);
 
             _tabs = gameObject.AddComponent<TabBar>();
             _tabs.Init(canvas, TabBarHeight);
-            _tabs.Add("Upgrades", "upgrades", null);
+            var upgradesTab = _tabs.Add("Upgrades", "upgrades", upgrades);
+            upgrades.AnyAffordable.Subscribe(upgradesTab.SetAlert).AddTo(this);
             var refineryTab = _tabs.Add("Refinery", "refinery", refinery);
             _tabs.Add("Codex", "codex", codex);
             _mapTab = _tabs.Add("Map", "map", starMap);
