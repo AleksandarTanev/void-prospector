@@ -8,7 +8,10 @@ using VoidProspector.UI;
 
 namespace VoidProspector.Mining
 {
-    /// <summary>Keeps 6–12 meteors drifting across the field above the ship. Meteors enter from the side edges and are pooled.</summary>
+    /// <summary>
+    /// Keeps 6–12 meteors drifting through the field above the ship. Meteors enter from the top or a side, drift down
+    /// and sideways, leave through a side, and are pooled.
+    /// </summary>
     public class MeteorField : MonoBehaviour
     {
         public GameRoot Root { get; private set; }
@@ -67,23 +70,42 @@ namespace VoidProspector.Mining
         {
             var spawn = Root.Session.RollMeteor();
             float r = spawn.size.radius;
+            // fromLeft = moving right. The belt travels with the ship, so meteors drift down and sideways
+            // (the starfield scrolling past sells the forward motion) and leave through a side.
             bool fromLeft = Random.value < 0.5f;
+            bool fromTop = !onScreen && Random.value < S.meteorTopEntryChance;
             float halfW = Root.HalfW;
+            float low = MinY + r, high = Mathf.Max(low, MaxY - r);
             Vector2 pos = default;
 
             // Try a few positions and keep the first that doesn't overlap another meteor.
             for (int attempt = 0; attempt < 10; attempt++)
             {
-                float y = Random.Range(MinY + r, Mathf.Max(MinY + r, MaxY - r));
-                float x = onScreen
-                    ? Random.Range(-halfW + r, halfW - r)
-                    : (fromLeft ? -halfW - r - 0.2f : halfW + r + 0.2f);
+                float x, y;
+                if (onScreen)
+                {
+                    x = Random.Range(-halfW + r, halfW - r);
+                    y = Random.Range(low, high);
+                }
+                else if (fromTop)
+                {
+                    // Just behind the top bar; not targetable until it drifts into the band.
+                    x = Random.Range(-halfW + r, halfW - r);
+                    y = MaxY + r + 0.2f;
+                }
+                else
+                {
+                    // Upper two thirds of the band, so it has room to fall before it crosses.
+                    x = fromLeft ? -halfW - r - 0.2f : halfW + r + 0.2f;
+                    y = Random.Range(Mathf.Lerp(low, high, 0.33f), high);
+                }
                 pos = new Vector2(x, y);
                 if (!Overlaps(pos, r)) break;
             }
 
             float speed = Random.Range(S.driftSpeed.x, S.driftSpeed.y);
-            var vel = new Vector2((fromLeft ? 1 : -1) * speed, Random.Range(-0.15f, 0.15f));
+            float fall = Random.Range(S.meteorFallSpeed.x, S.meteorFallSpeed.y);
+            var vel = new Vector2((fromLeft ? 1 : -1) * speed, -fall);
 
             var m = _pool.Get();
             m.Launch(spawn, pos, vel);
@@ -126,15 +148,24 @@ namespace VoidProspector.Mining
             return best;
         }
 
-        /// <summary>Nearest on-screen meteor (used by auto-fire in Phase 4), or null.</summary>
+        /// <summary>
+        /// On screen and inside the band: auto-fire and drones only shoot these (not meteors still entering from a
+        /// side or from behind the top bar).
+        /// </summary>
+        public bool IsTargetable(Meteor m)
+        {
+            Vector2 p = m.transform.position;
+            return m.Active && Mathf.Abs(p.x) <= Root.HalfW - 0.2f && p.y <= MaxY;
+        }
+
+        /// <summary>Nearest targetable meteor (used by auto-fire), or null.</summary>
         public Meteor Nearest(Vector2 from)
         {
             Meteor best = null;
             float bestD = float.MaxValue;
-            float halfW = Root.HalfW - 0.2f;
             foreach (var m in _active)
             {
-                if (Mathf.Abs(m.transform.position.x) > halfW) continue;
+                if (!IsTargetable(m)) continue;
                 float d = ((Vector2)m.transform.position - from).sqrMagnitude;
                 if (d < bestD) { bestD = d; best = m; }
             }

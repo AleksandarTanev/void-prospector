@@ -356,6 +356,12 @@ Median gaps after minute 5 stay below the GDD's (10 s in minutes 5–15 against 
   - Upgrades moved out of the bottom panel into their own tab dialog (credits, buy mode, full-height list); the bottom panel is now only cargo, Sell and auto-sell, so the play area is taller. The Upgrades tab turns gold when something is affordable; no tab is highlighted while no dialog is open
   - Open: a sci-fi display font (needs a TMP font asset made in Unity); credits counting up and coin cascade on Sell (feel pass); check on a real phone that 9-slice borders and text sizes read well
 - [ ] Feel pass: hit-stop on big cracks, slow-motion beat on Flawless drops, coin cascade on selling
+- [x] Sense of travel (branch `travel-feel`, merged): the ship flies forward through the belt instead of sitting still while meteors slide past. Checked in Unity
+  - [x] Starfield with 3 parallax layers scrolling down, the near layer as streaks (`Fx/Starfield`; numbers in `MiningSettings` → Travel). Uses scaled time, so hit-stop freezes space too
+  - [x] Meteors enter from the top (behind the top bar) or the upper part of a side and drift down and sideways (`meteorFallSpeed`, `meteorTopEntryChance`); at the bottom of the band they level off and glide out sideways instead of bouncing. Auto-fire and drones only target meteors inside the band (`MeteorField.IsTargetable`)
+  - [x] Engine trail from the nozzles (`Fx/ShipTrail` → `GameFx.Trail`, on the shared particle system)
+  - [x] Check in play mode: no stars popping at the edges with the camera tilt, meteors never reach the ship, trail stays behind the hull, tapping still easy; same with `GameRoot.lowPoly` off
+  - Later: ship banks toward its target and recoils on fire; warp streak on depth change and sector jump
 - [ ] Performance check on a cheap Android phone: steady 60 FPS, no stutter from creating objects
 
 **Done when:** a 2-minute screen recording of Sector 1 looks like a real game.

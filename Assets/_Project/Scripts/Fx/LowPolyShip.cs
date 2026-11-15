@@ -17,6 +17,17 @@ namespace VoidProspector.Fx
         Renderer[] _engines;
         float _t;
 
+        /// <summary>The engine glows, where the trail comes out.</summary>
+        public Transform[] Nozzles
+        {
+            get
+            {
+                var n = new Transform[_engines.Length];
+                for (int i = 0; i < n.Length; i++) n[i] = _engines[i].transform;
+                return n;
+            }
+        }
+
         /// <summary>Adds the model under <paramref name="ship"/>; <paramref name="accent"/> colours the wings and cockpit.</summary>
         public static LowPolyShip Build(Transform ship, Color accent)
         {

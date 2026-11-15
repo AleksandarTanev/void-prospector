@@ -36,7 +36,8 @@ Assets/_Project/
     Drones/      DroneBay, DroneTargeting (pure) + DroneSwarm (view)
     Idle/        OfflineEarnings (pure), OfflineController
     Analytics/   AnalyticsEvent, GameAnalytics, JsonLinesSink (pure) + AnalyticsController
-    Fx/          GameFx (particles, shake, hit-stop, popups, toasts), GameAudio (generated sounds), ShapeSprites
+    Fx/          GameFx (particles, shake, hit-stop, popups, toasts), GameAudio (generated sounds), ShapeSprites,
+                 Starfield (parallax layers scrolling down), ShipTrail (engine particles), LowPolyShip/LowPolyMeshes
     UI/          Hud, TabBar, UpgradePanel, StarMapPanel, RefineryPanel, CodexPanel, ScannerView, WelcomeBackPopup, ToastView,
                  DebugPanel, UiFactory (incl. Modal and ScrollList helpers for dialogs), UiTheme, UiButton
     Editor/      VoidProspector.Editor.asmdef — EconomyExport, PlaytestTools (Pacing Report, Open Save and Analytics Folder) menus,

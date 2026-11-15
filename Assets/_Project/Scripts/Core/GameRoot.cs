@@ -87,8 +87,8 @@ namespace VoidProspector.Core
 
             SetupCamera();
             if (lowPoly) SetupLight();
-            CreateStarfield();
-            var shipRenderer = CreateShip();
+            gameObject.AddComponent<Starfield>().Init(this, Session.Mining);
+            var shipRenderer = CreateShip(out var nozzles);
             var particleMaterial = new Material(shipRenderer.sharedMaterial) { name = "FX Particles", mainTexture = ShapeSprites.Circle.texture };
 
             Audio = gameObject.AddComponent<GameAudio>();
@@ -102,6 +102,7 @@ namespace VoidProspector.Core
 
             Hud.Init(this);
             Fx.Init(Cam, particleMaterial, Hud.PopupLayer, Hud.Toast);
+            gameObject.AddComponent<ShipTrail>().Init(this, nozzles);
             Chunks.Init(this);
             Meteors.Init(this);
             input.Init(this);
@@ -200,21 +201,8 @@ namespace VoidProspector.Core
             RenderSettings.ambientLight = ambientColor;
         }
 
-        void CreateStarfield()
-        {
-            var root = new GameObject("Starfield").transform;
-            var rng = new System.Random(7);
-            float R() => (float)rng.NextDouble();
-            for (int i = 0; i < 80; i++)
-            {
-                var star = ShapeSprites.NewRenderer("Star", ShapeSprites.Circle, root, -100);
-                star.transform.position = new Vector3((R() * 2 - 1) * HalfW * 1.1f, (R() * 2 - 1) * HalfH * 1.05f, 5);
-                star.transform.localScale = Vector3.one * Mathf.Lerp(0.03f, 0.09f, R());
-                star.color = new Color(0.8f, 0.85f, 1f, Mathf.Lerp(0.15f, 0.6f, R()));
-            }
-        }
-
-        SpriteRenderer CreateShip()
+        /// <param name="nozzles">Where the engine trail comes out.</param>
+        SpriteRenderer CreateShip(out Transform[] nozzles)
         {
             var hull = ShapeSprites.NewRenderer("Ship", ShapeSprites.Circle, null, 10);
             hull.color = shipColor;
@@ -227,7 +215,7 @@ namespace VoidProspector.Core
             {
                 // The hidden sprite still lends its material to the lasers and particles.
                 hull.enabled = false;
-                LowPolyShip.Build(Ship, shipColor);
+                nozzles = LowPolyShip.Build(Ship, shipColor).Nozzles;
                 return hull;
             }
 
@@ -235,6 +223,11 @@ namespace VoidProspector.Core
             drill.color = new Color(0.85f, 0.95f, 1f);
             drill.transform.localPosition = new Vector3(0, 0.55f, 0);
             drill.transform.localScale = new Vector3(0.22f, 0.45f, 1);
+
+            var nozzle = new GameObject("Nozzle").transform;
+            nozzle.SetParent(Ship, false);
+            nozzle.localPosition = new Vector3(0, -0.5f, 0);
+            nozzles = new[] { nozzle };
             return hull;
         }
     }

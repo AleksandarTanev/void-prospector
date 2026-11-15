@@ -101,10 +101,10 @@ namespace VoidProspector.Drones
         {
             _candidates.Clear();
             _targets.Clear();
-            float halfW = _root.HalfW - 0.2f;
-            foreach (var m in _root.Meteors.Active)
+            var field = _root.Meteors;
+            foreach (var m in field.Active)
             {
-                if (!m.Active || Mathf.Abs(m.transform.position.x) > halfW) continue;
+                if (!field.IsTargetable(m)) continue;
                 _candidates.Add(m);
                 var p = m.transform.position;
                 _targets.Add(new TargetInfo(p.x, p.y, (double)m.State.Hp, m.ContentValue));

@@ -170,9 +170,14 @@ namespace VoidProspector.Mining
             Vector2 p = transform.position;
             p += _vel * dt;
 
-            // Bounce inside the vertical band so meteors stay in the field.
-            if ((p.y < _field.MinY + Radius && _vel.y < 0) || (p.y > _field.MaxY - Radius && _vel.y > 0))
-                _vel.y = -_vel.y;
+            // Meteors only drift down. At the bottom of the band they level off and glide out sideways,
+            // so nothing sinks onto the ship.
+            float floor = _field.MinY + Radius;
+            if (p.y < floor)
+            {
+                p.y = floor;
+                _vel.y = Mathf.MoveTowards(_vel.y, 0, 1.5f * dt);
+            }
 
             transform.position = p;
             if (_lowPoly) _rock.transform.Rotate(_tumbleAxis, _spin * dt, Space.World);

@@ -65,12 +65,49 @@ namespace VoidProspector.Data
         [Tooltip("Seconds of slow motion when the top purity grade drops")]
         [Min(0)] public float topGradeHitStop = 0.25f;
 
+        [Header("Travel (look only: the ship flies forward through the belt)")]
+        [Tooltip("Background star layers, far to near. Each scrolls down at its own speed (parallax).")]
+        public StarLayer[] starLayers =
+        {
+            new StarLayer { count = 45, size = new Vector2(0.02f, 0.05f), alpha = new Vector2(0.15f, 0.35f), speed = 0.12f, stretch = 1f },
+            new StarLayer { count = 30, size = new Vector2(0.04f, 0.08f), alpha = new Vector2(0.3f, 0.55f), speed = 0.45f, stretch = 1f },
+            new StarLayer { count = 10, size = new Vector2(0.025f, 0.04f), alpha = new Vector2(0.15f, 0.3f), speed = 2.2f, stretch = 10f },
+        };
+        [Tooltip("Downward drift of meteors, world units per second (min, max)")]
+        public Vector2 meteorFallSpeed = new Vector2(0.1f, 0.35f);
+        [Tooltip("Chance a new meteor enters from the top instead of a side")]
+        [Range(0, 1)] public float meteorTopEntryChance = 0.5f;
+        [Tooltip("Engine trail particles per second, per engine")]
+        [Min(0)] public float trailRate = 28f;
+        [Tooltip("Speed the trail streams away from the engines")]
+        [Min(0)] public float trailSpeed = 2.5f;
+        [Min(0.01f)] public float trailSize = 0.12f;
+        [Tooltip("Trail particle lifetime in seconds (min, max)")]
+        public Vector2 trailLife = new Vector2(0.25f, 0.45f);
+        public Color trailColor = new Color(1f, 0.6f, 0.25f, 0.8f);
+
         void OnValidate()
         {
             if (maxMeteors < minMeteors) maxMeteors = minMeteors;
             if (driftSpeed.y < driftSpeed.x) driftSpeed.y = driftSpeed.x;
             if (respawnDelay.y < respawnDelay.x) respawnDelay.y = respawnDelay.x;
             if (chunkBurstSpeed.y < chunkBurstSpeed.x) chunkBurstSpeed.y = chunkBurstSpeed.x;
+            if (meteorFallSpeed.y < meteorFallSpeed.x) meteorFallSpeed.y = meteorFallSpeed.x;
+            if (trailLife.y < trailLife.x) trailLife.y = trailLife.x;
         }
+    }
+
+    /// <summary>One parallax layer of the scrolling starfield.</summary>
+    [System.Serializable]
+    public class StarLayer
+    {
+        [Min(0)] public int count = 30;
+        [Tooltip("Star diameter (streak width when stretched), world units (min, max)")]
+        public Vector2 size = new Vector2(0.03f, 0.06f);
+        public Vector2 alpha = new Vector2(0.2f, 0.5f);
+        [Tooltip("Scroll speed, world units per second")]
+        [Min(0)] public float speed = 0.3f;
+        [Tooltip("Length ÷ width; above 1 draws streaks")]
+        [Min(1)] public float stretch = 1f;
     }
 }

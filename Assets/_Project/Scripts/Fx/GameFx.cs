@@ -103,6 +103,20 @@ namespace VoidProspector.Fx
             }
         }
 
+        /// <summary>One engine-trail particle (keeps <paramref name="pos"/>'s z so it can sit behind the ship).</summary>
+        public void Trail(Vector3 pos, Vector2 vel, Color color, float size, float life)
+        {
+            var ep = new ParticleSystem.EmitParams
+            {
+                position = pos,
+                velocity = vel,
+                startColor = color,
+                startSize = size,
+                startLifetime = life,
+            };
+            _ps.Emit(ep, 1);
+        }
+
         public void Shake(float amount) => _shake = Mathf.Max(_shake, amount);
 
         public void HitStop(float seconds) => _hitStopUntil = Mathf.Max(_hitStopUntil, Time.unscaledTime + seconds);
