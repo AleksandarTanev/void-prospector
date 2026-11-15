@@ -1,6 +1,5 @@
 using System.Collections.Generic;
 using System.Globalization;
-using System.Linq;
 using R3;
 using TMPro;
 using UnityEngine;
@@ -132,8 +131,7 @@ namespace VoidProspector.UI
                 PlaceColumn(t.rectTransform, g, purity.Count);
             }
 
-            var minerals = Session.Database.minerals.Where(m => m != null).OrderBy(m => m.tier).ThenBy(m => m.baseValue);
-            foreach (var m in minerals) _rows.Add(BuildRow(content, m, purity.Count));
+            foreach (var m in UiTheme.SortedMinerals(Session.Database)) _rows.Add(BuildRow(content, m, purity.Count));
         }
 
         static MineralRow BuildRow(RectTransform content, MineralDefinition mineral, int grades)

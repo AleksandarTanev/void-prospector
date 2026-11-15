@@ -65,6 +65,10 @@ namespace VoidProspector.Core
         readonly ReactiveProperty<int> _autoSellBelow = new ReactiveProperty<int>(0);
         readonly Dictionary<SectorDefinition, DepthProgress> _depths = new Dictionary<SectorDefinition, DepthProgress>();
         readonly List<(MineralDefinition mineral, int count)> _reserve = new List<(MineralDefinition, int)>();
+        readonly Subject<(ChunkData chunk, CollectResult result)> _collected = new Subject<(ChunkData, CollectResult)>();
+
+        /// <summary>A chunk reached the ship and was stored or auto-sold (not when the hold was full). For the pickup feed.</summary>
+        public Observable<(ChunkData chunk, CollectResult result)> Collected => _collected;
 
         /// <summary>The sector the ship is in. Changes only through <see cref="TravelTo"/>.</summary>
         public SectorDefinition Sector => _sector.Value;
@@ -199,10 +203,12 @@ namespace VoidProspector.Core
             {
                 Wallet.Add(chunk.value);
                 Found(chunk);
+                _collected.OnNext((chunk, CollectResult.AutoSold));
                 return CollectResult.AutoSold;
             }
             if (!Cargo.TryAdd(chunk)) return CollectResult.CargoFull;
             Found(chunk);
+            _collected.OnNext((chunk, CollectResult.Stored));
             return CollectResult.Stored;
         }
 

@@ -78,12 +78,9 @@ namespace VoidProspector.UI
             tab.selected.rectTransform.offsetMax = new Vector2(-6, -2);
             tab.selected.gameObject.SetActive(false);
 
-            var hit = UiFactory.Panel("Hit", rt, new Color(0, 0, 0, 0));   // whole tab is tappable
-            UiFactory.Stretch(hit.rectTransform);
-            tab.button = hit.gameObject.AddComponent<UiButton>();
-            tab.button.targetGraphic = hit;
-            tab.button.transition = Selectable.Transition.None;
-            tab.button.onClick.AddListener(() => OnClick(index));
+            tab.button = UiFactory.HitArea(rt, "Hit", () => OnClick(index));   // whole tab is tappable
+            var hit = (RectTransform)tab.button.transform;
+            UiFactory.Stretch(hit);
 
             // Icon and label sit inside the tappable rect so they squash with it.
             tab.icon = UiFactory.Icon(hit.transform, "Icon", UiTheme.Icon(icon), UiTheme.Text);

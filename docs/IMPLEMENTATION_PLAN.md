@@ -362,6 +362,12 @@ Median gaps after minute 5 stay below the GDD's (10 s in minutes 5–15 against 
   - [x] Engine trail from the nozzles (`Fx/ShipTrail` → `GameFx.Trail`, on the shared particle system)
   - [x] Check in play mode: no stars popping at the edges with the camera tilt, meteors never reach the ship, trail stays behind the hull, tapping still easy; same with `GameRoot.lowPoly` off
   - Later: ship banks toward its target and recoils on fire; warp streak on depth change and sector jump
+- [x] Cargo view (branch `cargo-view`, merged): see what's in the hold. Checked in Unity
+  - [x] Cargo bar split into segments coloured by mineral (Codex order, `UiTheme.SortedMinerals`); a full hold turns the count and track red. Tap the cargo row (info icon) to open the Cargo dialog
+  - [x] Cargo dialog (`UI/CargoPanel`, no tab; closes when a tab opens and the other way round): one row per mineral with count, value and count per grade; minerals kept for the jump drive marked; Sell button
+  - [x] Pickup feed above the bottom panel (`UI/PickupFeed`, from `Session.Collected`): "+5 Copper", repeats merge while the line shows, auto-sold pickups show what they earned
+  - [x] Check in play mode: segments match the dialog, tapping the row opens it (Sell and Auto-sell don't), feed merges and fades, doesn't block taps
+  - Later, if testers keep opening the dialog: an always-visible mineral strip
 - [ ] Performance check on a cheap Android phone: steady 60 FPS, no stutter from creating objects
 
 **Done when:** a 2-minute screen recording of Sector 1 looks like a real game.

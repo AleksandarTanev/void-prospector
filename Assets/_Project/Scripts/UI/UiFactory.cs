@@ -162,6 +162,21 @@ namespace VoidProspector.UI
             return b;
         }
 
+        /// <summary>
+        /// An invisible tappable area (no colour change). Put the widgets it covers under it so they squash with it
+        /// when pressed (<see cref="UiButton.SetupFixedFrame"/>).
+        /// </summary>
+        public static UiButton HitArea(Transform parent, string name, UnityAction onClick)
+        {
+            var hit = Panel(name, parent, new Color(0, 0, 0, 0));
+            var b = hit.gameObject.AddComponent<UiButton>();
+            b.targetGraphic = hit;
+            b.transition = Selectable.Transition.None;
+            b.onClick.AddListener(onClick);
+            b.SetupFixedFrame(null);   // keep it invisible: no button sprite
+            return b;
+        }
+
         /// <summary>A square icon button (frame + icon), e.g. close or depth arrows.</summary>
         public static UiButton IconButton(Transform parent, string name, string icon, UnityAction onClick, float iconSize = 0.6f)
         {

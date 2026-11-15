@@ -38,12 +38,12 @@ Assets/_Project/
     Analytics/   AnalyticsEvent, GameAnalytics, JsonLinesSink (pure) + AnalyticsController
     Fx/          GameFx (particles, shake, hit-stop, popups, toasts), GameAudio (generated sounds), ShapeSprites,
                  Starfield (parallax layers scrolling down), ShipTrail (engine particles), LowPolyShip/LowPolyMeshes
-    UI/          Hud, TabBar, UpgradePanel, StarMapPanel, RefineryPanel, CodexPanel, ScannerView, WelcomeBackPopup, ToastView,
+    UI/          Hud, TabBar, UpgradePanel, StarMapPanel, RefineryPanel, CodexPanel, CargoPanel, PickupFeed, ScannerView, WelcomeBackPopup, ToastView,
                  DebugPanel, UiFactory (incl. Modal and ScrollList helpers for dialogs), UiTheme, UiButton
     Editor/      VoidProspector.Editor.asmdef — EconomyExport, PlaytestTools (Pacing Report, Open Save and Analytics Folder) menus,
                  UiSpriteImporter (import settings + 9-slice borders for Resources/UI)
   Resources/UI/            Frames/, Icons/, Minerals/ — UI sprites cut from art/ui-source/ by tools/ui/slice_ui.py
-Assets/Tests/EditMode/     VoidProspector.Tests.EditMode.asmdef (179 tests)
+Assets/Tests/EditMode/     VoidProspector.Tests.EditMode.asmdef (180 tests)
 tools/economy/             build_economy_xlsx.py
 tools/analytics/           summarize.py (playtest logs → pacing report)
 tools/ui/                  slice_ui.py (sprite sheets → Resources/UI)
@@ -70,7 +70,8 @@ Rules that keep this working:
 - **Refinery** (Phase 7): pure `Refining/Refinery` owned by the session; load, collect and sell through `Session.TryLoadRefinery / CollectRefinery / SellRefinery`, advance with `Session.TickRefinery` (the RefineryPanel does it every frame; `OfflineController` runs it for the time away). Odds, times and losses per step are in `GameDatabase.refinery.stages`; show players `ExpectedValueRatio` rather than raw odds.
 - **Codex**: `Session.Codex` fills on collect (`TryCollect`) and on refining success. Chunk values use `Session.ValueMultiplier(mineral)` = milestone bonus × codex bonus; any new permanent value bonus goes in there.
 - **Scanner**: range is the ScannerRange upgrade (0 = not bought). `MeteorScan` (pure) reads a meteor's remaining contents and decides "rare"; `ScannerView` draws labels on the HUD's popup layer and listens to `MeteorField.Spawned`.
-- Dialogs (Upgrades, Star Map, Refinery, Codex) are modals on their own canvases; all but Upgrades (which binds reactively) poll the session a few times a second while open, because the values they show change too often to bind one by one.
+- Dialogs (Upgrades, Star Map, Refinery, Codex, Cargo) are modals on their own canvases; all but Upgrades (which binds reactively) poll the session a few times a second while open, because the values they show change too often to bind one by one. Cargo has no tab (the HUD's cargo row opens it); Hud keeps it and the tab pages mutually exclusive.
+- **Cargo view:** the HUD cargo bar is split into one segment per mineral (`UiTheme.SortedMinerals`, the Codex order). `Session.Collected` (a `Subject`) fires for each stored or auto-sold chunk; `PickupFeed` shows it. Use it for anything else that reacts to pickups instead of hooking `ChunkField`.
 - New sectors: add the asset with an `index` one higher than the last, a non-empty `unlockCost`, `backgroundColor`, and list it in `GameDatabase.sectors`; `Validate` checks the chain.
 
 ## Saving
@@ -97,7 +98,7 @@ Rules that keep this working:
 - Sci-fi theme from generated art: dark navy 9-sliced frames with cyan edges, white icons tinted in code, low-poly mineral icons. Palette and sprite lookup in `UiTheme`; never hard-code a new colour in a panel if a theme colour fits.
 - Art pipeline: sheets in `art/ui-source/` (`ui_frames.png`, `ui_icons.png`, `ui_minerals.png`) → `python tools/ui/slice_ui.py art/ui-source Assets/_Project/Resources/UI` → one PNG per element. The frames sheet is cut by finding separate blobs in reading order (`FRAME_NAMES`); icons and minerals by grid. If a sheet is regenerated, check the names and order still match. The script also writes `bar_fill_white` (a tintable copy of the bar fill).
 - `UiSpriteImporter` sets sprite import settings and the 9-slice borders (table in the file). After changing a border: **Void Prospector → Reimport UI Sprites**.
-- Build UI only through `UiFactory`: `Frame` (sliced sprite, flat-colour fallback if missing), `Button(..., ButtonStyle, ...)` → `UiButton` (style sprite, disabled frame, press squash; change `Style` at runtime instead of tinting), `IconButton`, `Icon`, `Bar` (track + tinted fill, set `fill.anchorMax.x`), `ListRow`, `ListHeader`, `Modal`.
+- Build UI only through `UiFactory`: `Frame` (sliced sprite, flat-colour fallback if missing), `Button(..., ButtonStyle, ...)` → `UiButton` (style sprite, disabled frame, press squash; change `Style` at runtime instead of tinting), `IconButton`, `Icon`, `Bar` (track + tinted fill, set `fill.anchorMax.x`), `ListRow`, `ListHeader`, `Modal`, `HitArea` (invisible tappable rect; put the widgets it covers under it).
 - Layout: top bar (`Hud.TopBarHeight`), a short bottom panel (cargo, Sell, auto-sell) above the tab bar (`Hud.TabBarHeight`); `Hud.BottomPanelHeight` is both, and the ship sits above it. Tabs: Upgrades / Refinery / Codex / Map, all dialogs (no home tab; none is highlighted while nothing is open). The Upgrades tab turns gold via `UpgradePanel.AnyAffordable`. Dialogs opened by a tab implement `ITabPage` (`IsOpenRx`, `Open`, `Close`) and are `UiFactory.Modal(..., aboveTabBar: true, ...)` so the tabs stay tappable; the tab highlight follows `IsOpenRx`. Tabs can be `locked` (with an `onLocked` action) and `SetAlert` (gold).
 - Toasts go through `GameFx.Toast` → `ToastView` (one at a time, framed, DOTween slide + fade in unscaled time).
 

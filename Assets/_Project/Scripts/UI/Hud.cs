@@ -1,9 +1,11 @@
 using System;
+using System.Collections.Generic;
 using R3;
 using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
 using VoidProspector.Core;
+using VoidProspector.Data;
 using VoidProspector.Idle;
 
 namespace VoidProspector.UI
@@ -35,11 +37,16 @@ namespace VoidProspector.UI
         TabBar.Tab _mapTab;
         JumpState _jumpState;
         RectTransform _cargoFill, _depthFill;
-        Image _cargoFillImage;
+        Image _cargoTrack;
+        Color _cargoTrackColor;
+        CargoPanel _cargo;
+        List<MineralDefinition> _minerals;
+        readonly List<Image> _segments = new List<Image>();
 
         public void Init(GameRoot root)
         {
             _root = root;
+            _minerals = UiTheme.SortedMinerals(Session.Database);
             UiFactory.EnsureEventSystem();
             Build();
             Bind();
@@ -57,6 +64,7 @@ namespace VoidProspector.UI
             BuildBottomPanel(canvas);
             BuildTabs(canvas);
             gameObject.AddComponent<ScannerView>().Init(_root, PopupLayer);
+            gameObject.AddComponent<PickupFeed>().Init(Session, PopupLayer);
 
             Toast = ToastView.Create(canvas, TopBarHeight + 24);
 
@@ -124,18 +132,36 @@ namespace VoidProspector.UI
             bg.rectTransform.offsetMin = new Vector2(8, -10);
             bg.rectTransform.offsetMax = new Vector2(-8, 0);
 
-            // Cargo: icon, count, fill bar.
-            var crate = UiFactory.Icon(bottom, "Cargo Icon", UiTheme.Icon("cargo"), UiTheme.Text);
-            UiFactory.Square(crate.rectTransform, Vector2.zero, new Vector2(70, 160), 56);
-            _cargoText = UiFactory.Text(bottom, "Cargo", "", 34, TextAlignmentOptions.Left, UiTheme.Text);
-            _cargoText.fontStyle = FontStyles.Bold;
-            UiFactory.PlaceFromBottom(_cargoText.rectTransform, 0f, 0.4f, 132, 56, 0);
-            _cargoText.rectTransform.offsetMin = new Vector2(112, 132);
+            // Cargo row: icon, count, a bar split by mineral, and an info icon. Tapping anywhere on it opens the
+            // Cargo dialog; the widgets sit under the hit area so they squash with it.
+            var cargoRow = UiFactory.HitArea(bottom, "Cargo Row", ToggleCargo);
+            var row = (RectTransform)cargoRow.transform;
+            UiFactory.PlaceFromBottom(row, 0f, 1f, 128, 72, 24);
 
-            var cargoBar = UiFactory.Rect("Cargo Bar", bottom);
-            UiFactory.PlaceFromBottom(cargoBar, 0.4f, 1f, 142, 36, 40);
-            _cargoFill = UiFactory.Bar(cargoBar, "Bar", UiTheme.Accent, out _cargoFillImage);
+            var crate = UiFactory.Icon(row, "Cargo Icon", UiTheme.Icon("cargo"), UiTheme.Text);
+            UiFactory.Square(crate.rectTransform, new Vector2(0, 0.5f), new Vector2(46, 0), 56);
+            _cargoText = UiFactory.Text(row, "Cargo", "", 34, TextAlignmentOptions.Left, UiTheme.Text);
+            _cargoText.fontStyle = FontStyles.Bold;
+            var crt = _cargoText.rectTransform;
+            crt.anchorMin = Vector2.zero;
+            crt.anchorMax = new Vector2(0.4f, 1);
+            crt.offsetMin = new Vector2(88, 0);
+            crt.offsetMax = Vector2.zero;
+
+            var cargoBar = UiFactory.Rect("Cargo Bar", row);
+            cargoBar.anchorMin = new Vector2(0.4f, 0);
+            cargoBar.anchorMax = new Vector2(1f, 0);
+            cargoBar.offsetMin = new Vector2(16, 18);
+            cargoBar.offsetMax = new Vector2(-64, 54);
+            _cargoFill = UiFactory.Bar(cargoBar, "Bar", UiTheme.Accent, out var fillImage);
             UiFactory.Stretch((RectTransform)_cargoFill.parent);
+            // The fill rect only holds the mineral segments; the gaps between them show the track.
+            fillImage.enabled = false;
+            _cargoTrack = _cargoFill.parent.GetComponent<Image>();
+            _cargoTrackColor = _cargoTrack.color;
+
+            var info = UiFactory.Icon(row, "Info", UiTheme.Icon("info"), UiTheme.Muted);
+            UiFactory.Square(info.rectTransform, new Vector2(1, 0.5f), new Vector2(-28, 0), 40);
 
             _sell = UiFactory.Button(bottom, "Sell", ButtonStyle.Confirm, OnSell, out _sellLabel, 48);
             UiFactory.PlaceFromBottom((RectTransform)_sell.transform, 0f, 0.68f, 14, 112, 0);
@@ -166,6 +192,20 @@ namespace VoidProspector.UI
             _tabs.Add("Codex", "codex", codex);
             _mapTab = _tabs.Add("Map", "map", starMap);
             refinery.Init(_root, refineryTab);
+
+            // The Cargo dialog has no tab, but still only one dialog is open at a time.
+            _cargo = gameObject.AddComponent<CargoPanel>();
+            _cargo.Init(_root, OnSell, SellLabel);
+            foreach (var tab in _tabs.Tabs)
+                if (tab.page != null)
+                    tab.page.IsOpenRx.Where(open => open).Subscribe(_ => _cargo.Close()).AddTo(this);
+        }
+
+        void ToggleCargo()
+        {
+            if (_cargo.IsOpenRx.CurrentValue) { _cargo.Close(); return; }
+            _tabs.CloseAll();
+            _cargo.Open();
         }
 
         void OnSell()
@@ -308,21 +348,54 @@ namespace VoidProspector.UI
             _depthFill.anchorMax = new Vector2(depths.ProgressFraction, 1);
         }
 
+        /// <summary>Count, and the bar split into one segment per mineral (in the Codex order), sized by its share.</summary>
         void DrawCargo()
         {
             var cargo = Session.Cargo;
             _cargoText.text = $"{cargo.Count}<size=26><color=#9FB8DB>/{cargo.Capacity}</color></size>";
+            _cargoText.color = cargo.IsFull ? CargoFullColor : UiTheme.Text;
+            _cargoTrack.color = cargo.IsFull ? CargoFullColor : _cargoTrackColor;
             _cargoFill.anchorMax = new Vector2(cargo.Fill, 1);
-            _cargoFillImage.color = cargo.IsFull ? CargoFullColor : UiTheme.Accent;
+
+            int total = cargo.Count, shown = 0, before = 0;
+            if (total > 0)
+            {
+                foreach (var mineral in _minerals)
+                {
+                    int n = cargo.CountOf(mineral);
+                    if (n <= 0) continue;
+                    if (shown >= _segments.Count)
+                    {
+                        var seg = UiFactory.Panel("Segment", _cargoFill, Color.white);
+                        seg.raycastTarget = false;
+                        _segments.Add(seg);
+                    }
+                    var img = _segments[shown++];
+                    img.color = mineral.color;
+                    var rt = img.rectTransform;
+                    rt.anchorMin = new Vector2((float)before / total, 0);
+                    before += n;
+                    rt.anchorMax = new Vector2((float)before / total, 1);
+                    rt.offsetMin = Vector2.zero;
+                    rt.offsetMax = new Vector2(before < total ? -2 : 0, 0);   // a thin gap between minerals
+                    img.gameObject.SetActive(true);
+                }
+            }
+            for (int i = shown; i < _segments.Count; i++) _segments[i].gameObject.SetActive(false);
         }
 
         void DrawSell()
         {
-            var cargo = Session.Cargo;
+            _sellLabel.text = SellLabel();
+            _sell.interactable = !Session.Cargo.IsEmpty;
+        }
+
+        /// <summary>The Sell button's text (HUD and Cargo dialog): the value it gets, and what it keeps for the jump drive.</summary>
+        string SellLabel()
+        {
             var reserve = Session.JumpReserve;
             string keep = reserve.Count > 0 ? $"\n<size=22>keeps {reserve[0].count} {reserve[0].mineral.displayName} for the jump drive</size>" : "";
-            _sellLabel.text = cargo.IsEmpty ? "SELL" : $"SELL  $ {NumberFormatter.Format(Session.SellableValue)}{keep}";
-            _sell.interactable = !cargo.IsEmpty;
+            return Session.Cargo.IsEmpty ? "SELL" : $"SELL  $ {NumberFormatter.Format(Session.SellableValue)}{keep}";
         }
     }
 }

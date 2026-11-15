@@ -1,5 +1,7 @@
 using System.Collections.Generic;
+using System.Linq;
 using UnityEngine;
+using VoidProspector.Data;
 
 namespace VoidProspector.UI
 {
@@ -43,6 +45,10 @@ namespace VoidProspector.UI
 
         /// <summary>The chunk icon for a mineral id; minerals without art get the plain gem.</summary>
         public static Sprite Mineral(string id) => Load("UI/Minerals/" + id) ?? Load("UI/Minerals/gem");
+
+        /// <summary>All minerals in display order (tier, then base value): the cargo bar, Cargo dialog and Codex use it.</summary>
+        public static List<MineralDefinition> SortedMinerals(GameDatabase db) =>
+            db.minerals.Where(m => m != null).OrderBy(m => m.tier).ThenBy(m => m.baseValue).ToList();
 
         /// <summary>Icon per upgrade id (UpgradeDefinition.id).</summary>
         public static Sprite UpgradeIcon(string upgradeId)

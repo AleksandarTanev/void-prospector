@@ -210,6 +210,27 @@ namespace VoidProspector.Tests
         }
 
         [Test]
+        public void Collected_EmitsStoredAndAutoSold_NotWhenFull()
+        {
+            var s = new GameSession(_db, _sector, 1);
+            var rock = _db.GetMineral("rock");
+            var seen = new System.Collections.Generic.List<(ChunkData chunk, CollectResult result)>();
+            using var sub = s.Collected.Subscribe(seen.Add);
+
+            s.SetAutoSellBelow(1);
+            s.TryCollect(new ChunkData(rock, 0, 1));   // auto-sold
+            s.TryCollect(new ChunkData(rock, 1, 2));   // stored
+            s.Cargo.Capacity = 1;
+            Assert.AreEqual(CollectResult.CargoFull, s.TryCollect(new ChunkData(rock, 1, 2)));
+
+            Assert.AreEqual(2, seen.Count);
+            Assert.AreEqual(CollectResult.AutoSold, seen[0].result);
+            Assert.AreEqual(0, seen[0].chunk.grade);
+            Assert.AreEqual(CollectResult.Stored, seen[1].result);
+            Assert.AreSame(rock, seen[1].chunk.mineral);
+        }
+
+        [Test]
         public void Crits_HappenAtTheUpgradedRate()
         {
             var s = new GameSession(_db, _sector, 9);
